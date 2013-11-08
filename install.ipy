@@ -1,0 +1,14 @@
+#run as sudo
+dict_downloads=!cat dictionaries.txt
+
+for item in dict_downloads:
+  url=item.split(",")[1]
+  country=item.split(",")[0]+".zip"
+  !wget $url -O $country
+
+for item in dict_downloads:
+  country=item.split(",")[0]+".zip"
+  !unzip -C -o $country "dictionaries/*.dic" -d .
+  !unzip -C -o $country "dictionaries/*.aff" -d .
+
+!cp dictionaries/* /usr/share/myspell/dicts/
