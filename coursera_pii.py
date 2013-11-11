@@ -8,11 +8,11 @@ uselabcursor = uselabconn.cursor()
 
 print 'Creating table: coursera_pii'
 print ''
-sql_drop_coursera_pii = '''DROP TABLE IF EXISTS `coursera_pii_2`;'''
+sql_drop_coursera_pii = '''DROP TABLE IF EXISTS `coursera_pii`;'''
 uselabcursor.execute(sql_drop_coursera_pii)
 
 sql_create_coursera_pii = '''
-  CREATE TABLE IF NOT EXISTS `coursera_pii_2` (
+  CREATE TABLE IF NOT EXISTS `coursera_pii` (
   `user_id` INT NOT NULL,
   `session_id` VARCHAR(255) NOT NULL,
   `name` VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
@@ -31,7 +31,7 @@ for input_file in input_files:
   print '  Reading file: '+input_file
   print '  Processing...'
   with open(input_file,'rU') as IN:
-    sql_insert_into_coursera_pii = '''INSERT INTO coursera_pii_2 (user_id, session_id, name, email) VALUES (%s,%s,%s,%s);'''
+    sql_insert_into_coursera_pii = '''INSERT INTO coursera_pii (user_id, session_id, name, email) VALUES (%s,%s,%s,%s);'''
     for row_num, row in enumerate(IN):
       row = row.strip()            # get rid of trailing \n
       row = row.replace('"',"'")   # change " to '
