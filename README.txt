@@ -10,5 +10,7 @@ CREATE TABLE `coursera_index` (
   `pk` int(11) NOT NULL AUTO_INCREMENT,
   PRIMARY KEY (`pk`)
 ) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=latin1;
-
+ 
 where coursera_index.id is the name of each coursera course schema you are interested in.
+
+Some items may need to be downloaded.
