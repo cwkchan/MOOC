@@ -1,3 +1,5 @@
+# Python script to copy pii information from .csv to sql database
+
 from sqlconnection import *
 import glob
 
