@@ -1,37 +1,35 @@
-#git clone https://github.com/cab938/readability-score.git
-#sudo easy_install readability-score
-#sudo pip install nltk
-#sudo python -m nltk.downloader -d /usr/share/nltk_data all
-#sudo pip install hyphenator
-#sudo apt-get install python-enchant
+#    Copyright (C) 2013 The Regents of the University of Michigan
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 import argparse
-from sqlconnection import *
+from util.config import *
 from readability_score.calculators.fleschkincaid import FleschKincaid
 from StringIO import StringIO
 
 parser = argparse.ArgumentParser(description='Create derivative statistics tables relating to discussion forums.')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
-parser.add_argument('--schemas', help='An optional list of the schemas to create tables from', required=False)
 args = parser.parse_args()
 
-uselabconn=get_connection("uselab_mooc")
-uselabcursor=uselabconn.cursor()
+conn=get_connection()
+schemas=get_coursera_schema_list();
 
 if (args.clean):
-	sql_drop_coursera_message_stats="DROP TABLE IF EXISTS coursera_message_stats"
-	uselabcursor.execute(sql_drop_coursera_message_stats)
-if (args.schemas != None):
-	schemas=args.schemas.split(",");
-else:
-	#get a list of the databases to run this query over
-	sql_select_databases="select id from coursera_index;"
-	uselabcursor.execute(sql_select_databases);
-	schemas=[]
-	for row in uselabcursor:
-		schemas.append(row[0].encode('ascii','ignore'))
-	
-sql_create_coursera_message_stats="""CREATE TABLE IF NOT EXISTS `coursera_message_stats` (
+	query="DROP TABLE IF EXISTS coursera_message_stats"
+	conn.execute(query)
+
+query="""CREATE TABLE IF NOT EXISTS `coursera_message_stats` (
   `letter_count` int(11) DEFAULT NULL,
   `polysyllword_count` int(11) DEFAULT NULL,
   `sent_count` int(11) DEFAULT NULL,
@@ -49,9 +47,10 @@ sql_create_coursera_message_stats="""CREATE TABLE IF NOT EXISTS `coursera_messag
   PRIMARY KEY (`course_id`,`forum_posts_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;"""
 
-uselabcursor.execute(sql_create_coursera_message_stats)
+conn.execute(query)
 
 for schema_name in schemas:
+	
 	sql_insert_coursera_message_stats="""INSERT INTO coursera_message_stats (letter_count,polysyllword_count,sent_count,sentlen_average,simpleword_count,syll_count,word_count,wordlen_average,wordletter_average,wordsent_average,min_age,us_grade,course_id,forum_posts_id) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s);"""
 	
 	try:

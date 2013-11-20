@@ -1,3 +1,10 @@
+#git clone https://github.com/cab938/readability-score.git
+#sudo easy_install readability-score
+#sudo pip install nltk
+#sudo python -m nltk.downloader -d /usr/share/nltk_data all
+#sudo pip install hyphenator
+#sudo apt-get install python-enchant
+
 #run as sudo
 dict_downloads=!cat dictionaries.txt
 
@@ -12,3 +19,17 @@ for item in dict_downloads:
   !unzip -C -o $country "dictionaries/*.aff" -d .
 
 !cp dictionaries/* /usr/share/myspell/dicts/
+
+
+sudo apt-get install autoconf libtool
+git clone --recursive https://github.com/maxmind/libmaxminddb
+cd libmaxminddb
+./bootstrap
+./configure
+sudo make install
+cd ..
+sudo pip install maxminddb
+sudo ldconfig
+
+wget http://geolite.maxmind.com/download/geoip/database/GeoLite2-City.mmdb.gz
+gunzip GeoLite2-City.mmdb.gz 
