@@ -58,6 +58,8 @@ def get_coursera_schema_list():
 	return schemas
 
 def get_logger(name,verbose=False):
+	"""Returns a logger with the given name at either the debug or info level
+	"""
 	logger = logging.getLogger(name)
 	if verbose:
 		logging.basicConfig(level=logging.DEBUG)
