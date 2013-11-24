@@ -1,7 +1,4 @@
-#    Copy pii data from csv to SQL database.
-#    Copyright (C) 2013  Eric Koo <erickoo@umich.edu>
-#    Copyright (C) 2013  Christopher Brooks <brooksch@umich.edu>
-#    USE Lab, Digital Media Commons, University of Michigan Library
+#    Copyright (C) 2013  The Regents of the University of Michigan
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -17,6 +14,7 @@
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 import argparse
+import pandas as pd
 from sqlconnection import *
 
 parser = argparse.ArgumentParser(description='Copy pii data from csv to SQL database.')
@@ -45,14 +43,10 @@ uselabcursor.execute(sql_create_coursera_pii)
 csvs = args.csvs.split(',')
 
 for csv_file in csvs:
-  with open(csv_file,'rU') as IN:
-    sql_insert_into_coursera_pii = '''INSERT INTO coursera_pii (user_id, session_id, name, email) VALUES (%s,%s,%s,%s);'''
-    for row in IN:
-      row = row.strip()            # get rid of trailing \n
-      row = row.replace('"',"'")   # change " to '
-      row = row.split(';')
-      values = (row[0],csv_file.replace('.csv',''),row[1],row[2])
-      uselabcursor.execute(sql_insert_into_coursera_pii, values)
-      uselabconn.commit()
+  df = pd.io.parsers.read_csv(csv_file, delimiter=';')
+  df.columns = ['user_id', 'name', 'email']
+  df['session_id'] = csv_file.replace('.csv','')
+  df = df[['user_id', 'session_id', 'name', 'email']]
+  pd.io.sql.write_frame(df, 'coursera_pii', uselabconn, flavor='mysql', if_exists='append')
 
 uselabconn.close()
