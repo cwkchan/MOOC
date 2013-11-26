@@ -30,12 +30,12 @@ if (args.clean):
   uselabcursor.execute(sql_drop_coursera_pii)
 
 sql_create_coursera_pii = '''
-    CREATE TABLE IF NOT EXISTS `coursera_pii` (
-    `user_id` INT NOT NULL,
-    `session_id` VARCHAR(255) NOT NULL,
-    `name` VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
-    `email` VARCHAR(255) DEFAULT NULL,
-    PRIMARY KEY (`user_id`, `session_id`)
+    CREATE TABLE IF NOT EXISTS coursera_pii (
+    user_id INT NOT NULL,
+    session_id VARCHAR(255) NOT NULL,
+    name VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
+    email VARCHAR(255) DEFAULT NULL,
+    PRIMARY KEY (user_id, session_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
     '''
 uselabcursor.execute(sql_create_coursera_pii)
@@ -43,10 +43,14 @@ uselabcursor.execute(sql_create_coursera_pii)
 csvs = args.csvs.split(',')
 
 for csv_file in csvs:
+  session_id = csv_file.replace('.csv','')
   df = pd.io.parsers.read_csv(csv_file, delimiter=';')
   df.columns = ['user_id', 'name', 'email']
-  df['session_id'] = csv_file.replace('.csv','')
+  df['session_id'] = session_id
   df = df[['user_id', 'session_id', 'name', 'email']]
+  
+  sql_delete_session_id = '''DELETE FROM coursera_pii WHERE session_id=%s;'''
+  uselabcursor.execute(sql_delete_session_id, [session_id])
   pd.io.sql.write_frame(df, 'coursera_pii', uselabconn, flavor='mysql', if_exists='append')
 
 uselabconn.close()
