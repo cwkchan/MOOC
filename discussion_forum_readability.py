@@ -70,7 +70,6 @@ for schema_name in schemas:
 	logger.indo("Working with course {}".format(stats["course_id"]))
 	
 	for row in results:
-	 # fk = FleschKincaid(StringIO(row["post_text"].encode("utf_8")).read(), locale='/usr/share/myspell/dicts/hyph_en_US.dic')
 	  stats= generate_post_statistics(row["post_text"])
 	  stats["forum_posts_id"]=row["id"]
 	  stats["course_id"]=schema_name

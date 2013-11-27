@@ -38,7 +38,7 @@ parser.add_argument('--clean', action='store_true', help='Whether to drop tables
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
 args = parser.parse_args()
 
-logger=get_logger("cross_schema_views.py",args.verbose)
+logger=get_logger("geolocate.py",args.verbose)
 
 geolitedb="GeoLite2-City.mmdb"
 try:

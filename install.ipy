@@ -4,6 +4,7 @@
 !sudo python -m nltk.downloader -d /usr/share/nltk_data all
 !sudo pip install hyphenator
 !sudo apt-get install python-enchant
+!sudo pip install ujson
 
 dict_downloads=!cat dictionaries.txt
 

@@ -66,4 +66,26 @@ def get_logger(name,verbose=False):
 	else:
 		logging.basicConfig(level=logging.INFO)
 	return logger
-	
+
+__batch_insert_queue={}
+def db_batch_insert(connection, table, vals, batch_size=1000):
+	"""Batch inserts a set of values into a given table
+	"""
+	global __batch_insert_queue
+	#initialize this specific queue if it does not exist
+	key="{}.{}".format(connection.name,table.name)
+	if key not in __batch_insert_queue:
+		__batch_insert_queue[key]=[]
+	#add item to the batch
+	__batch_insert_queue[key].append(vals)
+	if len(__batch_insert_queue[key])>=batch_size:
+		connection.execute( table.insert().values(__batch_insert_queue[key]) )
+		__batch_insert_queue[key]=[]
+
+def db_batch_cleanup(connection, table):
+	key="{}.{}".format(connection.name,table.name)
+	if key not in __batch_insert_queue:
+		return
+	if len(__batch_insert_queue[key])>=0:
+		connection.execute( table.insert().values(__batch_insert_queue[key]) )
+		__batch_insert_queue[key]=[]
