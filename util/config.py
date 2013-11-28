@@ -17,6 +17,7 @@ import mysql.connector
 import ConfigParser
 from sqlalchemy import *
 import logging
+import os
 
 def get_properties():
 	"""Returns the list of properties as a dict of key/value pairs in
@@ -83,9 +84,15 @@ def db_batch_insert(connection, table, vals, batch_size=1000):
 		__batch_insert_queue[key]=[]
 
 def db_batch_cleanup(connection, table):
+	"""Flushes batch files waiting for commit to db"""
 	key="{}.{}".format(connection.name,table.name)
 	if key not in __batch_insert_queue:
 		return
 	if len(__batch_insert_queue[key])>=0:
 		connection.execute( table.insert().values(__batch_insert_queue[key]) )
 		__batch_insert_queue[key]=[]
+
+def filename_to_schema(fn):
+	"""Attempts to turn a filename in the form path\to\course.csv into
+	the value course"""
+	return os.path.basename(fn).split(".")[0]

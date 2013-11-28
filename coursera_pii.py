@@ -15,22 +15,28 @@
 
 import argparse
 import pandas as pd
-from sqlconnection import *
+from os import listdir
+from util.config import *
 
 parser = argparse.ArgumentParser(description='Copy pii data from csv to SQL database.')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
-parser.add_argument('--csvs', help='A list of csv files to create tables from', required=True)
+parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
+group = parser.add_mutually_exclusive_group(required=True)
+group.add_argument('--csvs', help='A list of csv files to create tables from')
+group.add_argument('--dir', help='A directory with CSV files in it')
 args = parser.parse_args()
 
-uselabconn = get_connection('uselab_mooc')
-uselabcursor = uselabconn.cursor()
+logger=get_logger("coursera_clickstream.py",args.verbose)
+conn=get_connection()
 
 if (args.clean):
-  sql_drop_coursera_pii = '''DROP TABLE IF EXISTS `coursera_pii`;'''
-  uselabcursor.execute(sql_drop_coursera_pii)
-
-sql_create_coursera_pii = '''
-    CREATE TABLE IF NOT EXISTS coursera_pii (
+	query="""DROP TABLE IF EXISTS `coursera_pii`"""
+	try:
+		conn.execute(query)
+	except:
+		pass
+		
+query='''CREATE TABLE IF NOT EXISTS coursera_pii (
     user_id INT NOT NULL,
     session_id VARCHAR(255) NOT NULL,
     name VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
@@ -38,19 +44,33 @@ sql_create_coursera_pii = '''
     PRIMARY KEY (user_id, session_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
     '''
-uselabcursor.execute(sql_create_coursera_pii)
+conn.execute(query)
 
-csvs = args.csvs.split(',')
+if (args.dir!=None):
+	csvs = listdir(args.dir)
+	csvs=map(lambda x:args.dir+x,csvs)
+else:
+	csvs = args.csvs.split(',')
 
 for csv_file in csvs:
-  session_id = csv_file.replace('.csv','')
-  df = pd.io.parsers.read_csv(csv_file, delimiter=';')
+  session_id = filename_to_schema(csv_file)
+  logger.debug("Reading file {} into dataframe.".format(csv_file))
+  try:
+  	df = pd.io.parsers.read_csv(csv_file, delimiter=';')
+  except Exception, e:
+  	logger.warn("Exception found, skipping this file: {}".format(e))
+  	continue
   df.columns = ['user_id', 'name', 'email']
   df['session_id'] = session_id
   df = df[['user_id', 'session_id', 'name', 'email']]
-  
-  sql_delete_session_id = '''DELETE FROM coursera_pii WHERE session_id=%s;'''
-  uselabcursor.execute(sql_delete_session_id, [session_id])
-  pd.io.sql.write_frame(df, 'coursera_pii', uselabconn, flavor='mysql', if_exists='append')
-
-uselabconn.close()
+  #should we be doing this if they didn't say --clean?
+  try:
+  	sql_delete_session_id = '''DELETE FROM coursera_pii WHERE session_id='{}';'''.format(session_id)
+  	conn.execute(sql_delete_session_id)
+  	#boo, workaround for bug https://github.com/pydata/pandas/issues/2754
+  	df[df.columns] = df[df.columns].astype(object) #convert the dataframe to a single type to replaces nulls with Nones
+  	df[pd.isnull(df)] = None #SQL wants None, not NaN
+  	logger.debug("Writing data from file {} into database.".format(csv_file))
+  	pd.io.sql.write_frame(df, 'coursera_pii', conn.raw_connection(), flavor='mysql', if_exists='append')
+  except Exception, e:
+		logger.warn("Exception {}".format(e))
