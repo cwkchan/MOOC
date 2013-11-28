@@ -17,6 +17,7 @@ import argparse
 import pandas as pd
 from os import listdir
 from util.config import *
+from names.clean_names import *
 
 parser = argparse.ArgumentParser(description='Copy pii data from csv to SQL database.')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
@@ -41,6 +42,10 @@ query='''CREATE TABLE IF NOT EXISTS coursera_pii (
     session_id VARCHAR(255) NOT NULL,
     name VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
     email VARCHAR(255) DEFAULT NULL,
+		`first_name` VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
+		`middle_name` VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
+		`last_name` VARCHAR(255) CHARACTER SET utf32 DEFAULT NULL,
+		`name_cleaning_confidence` float DEFAULT NULL,
     PRIMARY KEY (user_id, session_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
     '''
@@ -63,6 +68,12 @@ for csv_file in csvs:
   df.columns = ['user_id', 'name', 'email']
   df['session_id'] = session_id
   df = df[['user_id', 'session_id', 'name', 'email']]
+  
+  #clean the names
+  #this was not immediatly clear to me, kudos to:
+  #http://stackoverflow.com/questions/12356501/pandas-create-two-new-columns-in-a-dataframe-with-values-calculated-from-a-pre
+  df["first_name"],df["middle_name"],df["last_name"],df["name_cleaning_confidence"]=zip(*map(clean, df["name"]))
+
   #should we be doing this if they didn't say --clean?
   try:
   	sql_delete_session_id = '''DELETE FROM coursera_pii WHERE session_id='{}';'''.format(session_id)
