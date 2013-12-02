@@ -1,7 +1,7 @@
 [db]
-engine=mysql+mysqlconnector://mooc_ro:umichcourseramooc@slam.si.umich.edu/
+engine=mysql+mysqlconnector://username:pass@host/
 schema=uselab_mooc
 index=coursera_index
 
 [schemas]
-#schemas=sna-001,sna-002
+#schemas=course-001,course-002
