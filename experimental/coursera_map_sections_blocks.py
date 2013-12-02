@@ -36,15 +36,18 @@ if (args.clean):
   except:
     pass
 
-query = """
-  CREATE TABLE IF NOT EXISTS coursera_map_sections_blocks (
-    session_id VARCHAR(255) NOT NULL,
-    section_id INT(11) NOT NULL,
-    block_id INT(11) NOT NULL,
-    PRIMARY KEY (session_id, section_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-  """
-conn.execute(query)
+try:
+  query = """
+    CREATE TABLE IF NOT EXISTS coursera_map_sections_blocks (
+      session_id VARCHAR(255) NOT NULL,
+      section_id INT(11) NOT NULL,
+      block_id INT(11) NOT NULL,
+      PRIMARY KEY (session_id, section_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+    """
+  conn.execute(query)
+except:
+  pass
 
 # Check which sessions are already in the database
 query = """SELECT DISTINCT session_id FROM coursera_map_sections_blocks;"""

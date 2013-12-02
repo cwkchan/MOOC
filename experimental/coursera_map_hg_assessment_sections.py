@@ -36,17 +36,20 @@ if (args.clean):
   except:
     pass
 
-query = """
-  CREATE TABLE IF NOT EXISTS `coursera_map_hg_assessment_sections` (
-    `session_id` VARCHAR(255) NOT NULL,
-    `item_type` VARCHAR(255) NOT NULL,
-    `item_id` INT(11) NOT NULL,
-    `section_id` INT(11) NOT NULL,
-    `order` INT(11) NOT NULL,
-    PRIMARY KEY (`session_id`, `item_type`, `item_id`)
-  ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-  """
-conn.execute(query)
+try:
+  query = """
+    CREATE TABLE IF NOT EXISTS `coursera_map_hg_assessment_sections` (
+      `session_id` VARCHAR(255) NOT NULL,
+      `item_type` VARCHAR(255) NOT NULL,
+      `item_id` INT(11) NOT NULL,
+      `section_id` INT(11) NOT NULL,
+      `order` INT(11) NOT NULL,
+      PRIMARY KEY (`session_id`, `item_type`, `item_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+    """
+  conn.execute(query)
+except:
+  pass
 
 # Check which sessions are already in the database
 query = """SELECT DISTINCT session_id FROM coursera_map_hg_assessment_sections;"""
