@@ -1,0 +1,7 @@
+[db]
+engine=mysql+mysqlconnector://username:pass@host/
+schema=uselab_mooc
+index=coursera_index
+
+[schemas]
+#schemas=course-001,course-002
