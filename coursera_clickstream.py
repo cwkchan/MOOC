@@ -48,7 +48,7 @@ __coursera_clickstream_handlers={"pageview":__default_pageview_handler,
 
 parser = argparse.ArgumentParser(description='Import coursera clickstream data files into the database')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
-parser.add_argument('--files', action='store', help='A comma separated list of the files to import')
+parser.add_argument('--files', action='store', required="True", help='A comma separated list of the files to import')
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
 args = parser.parse_args()
 
@@ -69,39 +69,46 @@ if (args.clean):
 	except:
 		pass
 
+"""	`12` varchar(64) DEFAULT NULL,
+	`13` varchar(8) DEFAULT NULL,
+	`14` text DEFAULT NULL,
+"""
 query="""CREATE TABLE `coursera_clickstream` (
+  `client` varchar(32) DEFAULT NULL,
+  `from` text DEFAULT NULL,
 	`id` varchar(255) DEFAULT NULL,
   `key` varchar(64) DEFAULT NULL,
-  `page_url` varchar(2048) DEFAULT NULL,
-  `user_agent` varchar(1024) DEFAULT NULL,
-  `session` varchar(64) DEFAULT NULL,
-  `user_ip` varchar(128) DEFAULT NULL,
-  `client` varchar(32) DEFAULT NULL,
-  `value` bigint DEFAULT NULL,
-  `timestamp` bigint(11) NOT NULL,
-  `language` varchar(512) DEFAULT NULL,
-  `from` varchar(1024) DEFAULT NULL,
-  `username` varchar(64) NOT NULL, 
+  `language` text DEFAULT NULL,
+  `page_url` text DEFAULT NULL,
   `pk` bigint NOT NULL AUTO_INCREMENT,
+  `session` varchar(64) DEFAULT NULL,
+  `timestamp` bigint(11) NOT NULL,
+  `user_agent` text DEFAULT NULL,
+  `user_ip` varchar(128) DEFAULT NULL,
+  `username` varchar(64) NOT NULL, 
+  `value` bigint DEFAULT NULL,
   primary key (pk)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 """
 
 conn.execute(query)
-
+	
 query="""CREATE TABLE `coursera_clickstream_video` (
+  `@` varchar(128) DEFAULT NULL,
+  `@candy` text DEFAULT NULL,
+  `currentTime` float DEFAULT NULL,
+  `error` varchar(8) DEFAULT NULL,
+  `eventTimestamp` bigint(20) DEFAULT NULL,
+  `fragment` tinytext DEFAULT NULL,
   `id` bigint(20) NOT NULL AUTO_INCREMENT,
-  `readyState` int(11) DEFAULT NULL,
   `initTimestamp` bigint(20) DEFAULT NULL,
-  `type` varchar(32) DEFAULT NULL,
-  `playbackRate` float DEFAULT NULL,
-  `paused` varchar(5) DEFAULT NULL,
   `lectureID` int(11) DEFAULT NULL,
   `networkState` int(11) DEFAULT NULL,
-  `eventTimestamp` bigint(20) DEFAULT NULL,
-  `error` varchar(128) DEFAULT NULL,
+  `paused` varchar(5) DEFAULT NULL,
+  `playbackRate` float DEFAULT NULL,
   `prevTime` float DEFAULT NULL,
-  `currentTime` float DEFAULT NULL,
+  `readyState` int(11) DEFAULT NULL,
+  `type` varchar(32) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 """
