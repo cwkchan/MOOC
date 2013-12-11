@@ -69,17 +69,20 @@ def get_logger(name,verbose=False):
 	return logger
 
 __batch_insert_queue={}
-def db_batch_insert(connection, table, vals, batch_size=1000):
+__batch_size=1000
+def db_batch_insert(connection, table, vals, batch_size=__batch_size):
 	"""Batch inserts a set of values into a given table
 	"""
 	global __batch_insert_queue
+	global __batch_size
+	__batch_size=batch_size
 	#initialize this specific queue if it does not exist
 	key="{}.{}".format(connection.name,table.name)
 	if key not in __batch_insert_queue:
 		__batch_insert_queue[key]=[]
 	#add item to the batch
 	__batch_insert_queue[key].append(vals)
-	if len(__batch_insert_queue[key])>=batch_size:
+	if len(__batch_insert_queue[key])>=__batch_size:
 		connection.execute( table.insert().values(__batch_insert_queue[key]) )
 		__batch_insert_queue[key]=[]
 

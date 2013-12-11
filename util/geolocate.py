@@ -18,6 +18,7 @@ import maxminddb
 from util.config import *
 import sys
 from sqlalchemy import *
+from sqlalchemy.exc import *
 
 def __get_nested_item(item, dikt):
 	"""Gets an item out of a nested dictionary of items, or None if it
@@ -33,9 +34,11 @@ def __get_nested_item(item, dikt):
 	except:
 		return None
 
-parser = argparse.ArgumentParser(description='Create tables to map IP addresses to countries')
+parser = argparse.ArgumentParser(description='Create tables to map IP addresses to countries.  This script can be called directly, but is intended to be called by other python scripts in this package.  The result of running this script is that IP address details are populated in the coursera_geolocate table.  For instance, if you wanted to call this script on all IP addresses from the coursera last_ip value in all of your schemas you might use: python ./geolocate.py  --clean --verbose --sql="SELECT DISTINCT last_access_ip FROM users WHERE last_access_ip IS NOT NULL AND last_access_ip NOT LIKE \'\'"')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
+parser.add_argument('--schemas', action='store', help='The comma separated list of schemas to run the query on, defaults to values in configuration file or coursera_index table')
+parser.add_argument('--sql', action='store', required="True", help='The query to run, must return list of IP addresses.  E.g. SELECT DISTINCT last_access_ip FROM users WHERE last_access_ip IS NOT NULL AND last_access_ip NOT LIKE ""' )
 args = parser.parse_args()
 
 logger=get_logger("geolocate.py",args.verbose)
@@ -48,7 +51,11 @@ except:
 	sys.exit()
 
 conn=get_connection()
-schemas=get_coursera_schema_list()
+
+if (args.schemas!=None):
+	schemas=args.schemas.split(",")
+else:
+	schemas=get_coursera_schema_list()
 
 if (args.clean):
 	query="DROP TABLE IF EXISTS coursera_geolocate"
@@ -81,7 +88,9 @@ metadata = MetaData()
 metadata.reflect(bind=conn)
 tbl_coursera_geolocate=metadata.tables["coursera_geolocate"]
 
-query="""SELECT DISTINCT last_access_ip FROM users WHERE last_access_ip IS NOT NULL AND last_access_ip NOT LIKE ''"""
+query=args.sql
+#todo: should get the list of IPs already setup in the db so we don't have to bother
+#looking them up again
 ip_set=set()
 for schema in schemas:
 	try:
@@ -89,7 +98,7 @@ for schema in schemas:
 		results=schema_conn.execute(query)
 		for row in results:
 			#sometimes multiple IPs
-			ip=row["last_access_ip"]
+			ip=row[0]
 			if len(ip.split(",")) > 1:
 				map(ip_set.add,ip.split(","))
 			else:
@@ -113,6 +122,12 @@ for ip in ip_set:
 		output_dict["postal"]=__get_nested_item(["postal","code"], entry_dict)
 		output_dict["time_zone"]=__get_nested_item(["location","time_zone"], entry_dict)
 		conn.execute( tbl_coursera_geolocate.insert().values(output_dict) )
+	except IntegrityError, ie:
+		#supress duplicate key errors in MySQL
+		if str(ie.orig).startswith("1062: Duplicate"):
+			continue
+		else:
+			logger.warn("Error entering data for ip {} {}".format(ip,ie))
 	except Exception, e:
 		logger.warn("Error entering data for ip {} {}".format(ip,e))
 
