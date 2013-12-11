@@ -22,22 +22,58 @@ def get_params(params):
     param_list[param] = val
   return param_list
 
+def url_to_tuple(url):
+  """Takes a coursera resource url and returns a tuple 
+  (course_id,path,resource,parameters), e.g. 
+  'https://class.coursera.org/sna-002/forum/list?forum_id=2' 
+  would be returned as ("sna-002","forum","list","forum_id=2").  
+  Path parameters do not include leading or trailing slashes. 
+  Returns None of the function is not a coursera url, and 
+  throws a InvalidCourseUrlException if the URL cannot be 
+  decomposed."""
+
+  try:
+    try:
+      url_re = re.search(r'\Ahttps://class.coursera.org/([^/]+)/([^/]+)/(.*\Z)', url)
+      course_id = url_re.group(1)
+      path = url_re.group(2)
+      end = url_re.group(3)
+    except:
+      # not a Coursera URL
+      return None
+      
+    if end.find('?') != -1:
+      # parameters
+      resource, parameters = end.split('?')
+    elif end.find('#') != -1:
+      resource, parameters = end.split('#')
+    else:
+      # no parameters
+      resource = end
+      parameters = None
+
+    return (course_id, path, resource, parameters)
+    
+  except Exception, e:
+    # return InvalidCourseUrlException if URL cannot be decomposed
+    return 'InvalidCourseUrlException'
+
+'''
 test_cases = []
 test_cases.append('https://class.coursera.org/sna-002/lecture/view?lecture_id=2')
 test_cases.append('https://class.coursera.org/sna-002/lecture/view?lecture_id=75&amp;preview=1')
+test_cases.append('https://class.coursera.org/sna-002/lecture/9')
 test_cases.append('https://class.coursera.org/sna-002/forum/thread?thread_id=976')
 test_cases.append('https://class.coursera.org/sna-002/forum/list?forum_id=2')
+test_cases.append('https://class.coursera.org/sna-002/forum/index#blahblah')
+test_cases.append('https://class.coursera.org/sna-002/class/index')
+test_cases.append('https://class.coursera.org/sna-002/class/preferences')
+test_cases.append('https://class.coursera.org/sna-002/wiki/view?id=blah')
+test_cases.append('http://www.google.com/')
+test_cases.append('http://www.coursera.org/')
+test_cases.append('https://class.coursera.org/sna-002/class/preferences?preferences?')
+test_cases.append('https://class.coursera.org/sna-002/forum/index#forum-threads-all-0-state-page_num=39')
 
-for url in test_cases:
-  url_re = re.search(r'\Ahttps://class.coursera.org/([^/]+)/([^/]+)/([^/]+)\?([^/]+\Z)', url)
-  session_id = url_re.group(1)
-  item_type = url_re.group(2)
-  action = url_re.group(3)
-  params = get_params(url_re.group(4))
-  if item_type == 'lecture':
-    print item_type+': '+action+' (lecture_id='+params['lecture_id']+')'
-  elif item_type == 'forum':
-    if action == 'thread':
-      print item_type+': '+action+' (thread_id='+params['thread_id']+')'
-    elif action == 'list':
-      print item_type+': '+action+' (forum_id='+params['forum_id']+')'
+for case in test_cases:
+  print url_to_tuple(case)
+'''
