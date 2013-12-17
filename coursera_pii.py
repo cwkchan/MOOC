@@ -61,7 +61,7 @@ for csv_file in csvs:
   session_id = filename_to_schema(csv_file)
   logger.debug("Reading file {} into dataframe.".format(csv_file))
   try:
-  	df = pd.io.parsers.read_csv(csv_file, delimiter=';')
+  	df = pd.io.parsers.read_csv(csv_file, delimiter=',')
   except Exception, e:
   	logger.warn("Exception found, skipping this file: {}".format(e))
   	continue
