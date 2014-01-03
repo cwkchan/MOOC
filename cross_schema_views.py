@@ -20,21 +20,28 @@ parser = argparse.ArgumentParser(description='Create views across schemas')
 parser.add_argument('--table', action='store', help='The name of the table within each schema')
 parser.add_argument('--columns', action='store', help='The name of the columns to pull from each schema')
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
+parser.add_argument('--include-self', action='store_true',
+                    help='If this flag exists the table a row comes from will be stored in column "source"')
 args = parser.parse_args()
 
-logger=get_logger("cross_schema_views.py",args.verbose)
+logger = get_logger("cross_schema_views.py", args.verbose)
 
-query=""
-schemas=get_coursera_schema_list();
+query = ""
+schemas = get_coursera_schema_list();
 for schema_name in schemas:
-	sub_query="""SELECT {} FROM `{}`.{}""".format(args.columns,schema_name,args.table)
-	query=query+" UNION "+sub_query
-query="CREATE OR REPLACE VIEW cross_{} as {};".format( args.table,query[7:] )
+    #check to see if the source should be added
+    subquery=""
+    if args.include_self:
+        sub_query = """SELECT {}, '{}' source FROM `{}`.{}""".format(args.columns, schema_name, schema_name, args.table)
+    else:
+        sub_query = """SELECT {} FROM `{}`.{}""".format(args.columns, schema_name, args.table)
+    query = query + " UNION " + sub_query
+query = "CREATE OR REPLACE VIEW cross_{} as {};".format(args.table, query[7:])
 
 logging.info("Preparing query: {}".format(query))
 
 try:
-	conn=get_connection()
-	conn.execute(query)
+    conn = get_connection()
+    conn.execute(query)
 except Exception, e:
-	logger.warn("Error running query, exception: {}".format(e))
+    logger.warn("Error running query, exception: {}".format(e))
