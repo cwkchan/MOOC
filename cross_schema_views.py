@@ -21,6 +21,7 @@ parser.add_argument('--clean', action='store_true', help='Whether to drop views 
 parser.add_argument('--columns', action='store', help='The name of the columns to pull from each schema')
 parser.add_argument('--include-self', action='store_true',
                     help='If this flag exists the table a row comes from will be stored in column "source"')
+parser.add_argument('--materialized', action='store_true', help='If True the view will be created as a base table')
 parser.add_argument('--table', action='store', help='The name of the table within each schema')
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
 args = parser.parse_args()
@@ -29,14 +30,18 @@ logger = get_logger("cross_schema_views.py", args.verbose)
 
 conn = get_connection()
 if args.clean:
-    query = "DROP VIEW IF EXISTS cross_{}".format(args.table)
+    query=""
+    if args.materialized:
+        query = "DROP TABLE IF EXISTS cross_{}".format(args.table)
+    else:
+        query = "DROP VIEW IF EXISTS cross_{}".format(args.table)
     try:
         conn.execute(query)
     except:
         pass
 
 query = ""
-schemas = get_coursera_schema_list();
+schemas = get_coursera_schema_list()
 for schema_name in schemas:
     #check to see if the source should be added
     subquery = ""
@@ -45,11 +50,15 @@ for schema_name in schemas:
     else:
         sub_query = "SELECT {} FROM `{}`.{}".format(args.columns, schema_name, args.table)
     query = query + " UNION " + sub_query
-query = "CREATE OR REPLACE VIEW cross_{} as {};".format(args.table, query[7:])
+
+if args.materialized:
+    query = "CREATE TABLE cross_{} as {};".format(args.table, query[7:])
+else:
+    query = "CREATE OR REPLACE VIEW cross_{} as {};".format(args.table, query[7:])
 
 logging.info("Preparing query: {}".format(query))
 
 try:
     conn.execute(query)
 except Exception, e:
-    logger.warn("Error running query, exception: {}".format(e))
+    logger.info("Error running query, exception: {}".format(e))
