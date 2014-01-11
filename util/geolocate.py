@@ -15,7 +15,7 @@
 
 import argparse
 import maxminddb
-from util.config import *
+from config import *
 import sys
 from sqlalchemy import *
 from sqlalchemy.exc import *
