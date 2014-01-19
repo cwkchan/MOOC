@@ -18,11 +18,14 @@ from util.config import *
 
 parser = argparse.ArgumentParser(description='Create views across schemas')
 parser.add_argument('--clean', action='store_true', help='Whether to drop views first')
-parser.add_argument('--columns', action='store', help='The name of the columns to pull from each schema')
+parser.add_argument('--columns', action='store', default="*",
+                    help='The name of the columns to pull from each schema, defaults to all')
 parser.add_argument('--include-self', action='store_true',
                     help='If this flag exists the table a row comes from will be stored in column "source"')
 parser.add_argument('--materialized', action='store_true', help='If True the view will be created as a base table')
-parser.add_argument('--table', action='store', help='The name of the table within each schema')
+parser.add_argument('--schemas', action='store',
+                    help='An optional list of schemas to consider, defaults to all those in the coursera_index table')
+parser.add_argument('--table', action='store', required=True, help='The name of the table within each schema')
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
 args = parser.parse_args()
 
@@ -30,7 +33,7 @@ logger = get_logger("cross_schema_views.py", args.verbose)
 
 conn = get_connection()
 if args.clean:
-    query=""
+    query = ""
     if args.materialized:
         query = "DROP TABLE IF EXISTS cross_{}".format(args.table)
     else:
@@ -41,18 +44,24 @@ if args.clean:
         pass
 
 query = ""
-schemas = get_coursera_schema_list()
+
+schemas = []
+if args.schemas:
+    schemas = args.schemas.split(",")
+else:
+    schemas = get_coursera_schema_list()
+
 for schema_name in schemas:
     #check to see if the source should be added
     subquery = ""
     if args.include_self:
-        sub_query = "SELECT {}, '{}' source FROM `{}`.{}".format(args.columns, schema_name, schema_name, args.table)
+        sub_query = "SELECT {}, '{}' SOURCE FROM `{}`.{}".format(args.columns, schema_name, schema_name, args.table)
     else:
         sub_query = "SELECT {} FROM `{}`.{}".format(args.columns, schema_name, args.table)
     query = query + " UNION " + sub_query
 
 if args.materialized:
-    query = "CREATE TABLE cross_{} as {};".format(args.table, query[7:])
+    query = "CREATE TABLE cross_{} AS {};".format(args.table, query[7:])
 else:
     query = "CREATE OR REPLACE VIEW cross_{} as {};".format(args.table, query[7:])
 
