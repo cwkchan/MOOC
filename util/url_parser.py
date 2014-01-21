@@ -14,16 +14,30 @@
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 import re
+from util.config import *
+
+
+class InvalidCourseraUrlException(Exception):
+    def __init__(self, value):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+logger = get_logger("url_parser.py")
+
 
 def get_params(params):
-  param_list = {}
-  for param in params.split('&amp;'):
-    param, val = param.split('=')
-    param_list[param] = val
-  return param_list
+    param_list = {}
+    for param in params.split('&amp;'):
+        param, val = param.split('=')
+        param_list[param] = val
+    return param_list
+
 
 def url_to_tuple(url):
-  """Takes a coursera resource url and returns a tuple 
+    """Takes a coursera resource url and returns a tuple
   (course_id,path,resource,parameters), e.g. 
   'https://class.coursera.org/sna-002/forum/list?forum_id=2' 
   would be returned as ("sna-002","forum","list","forum_id=2").  
@@ -32,31 +46,32 @@ def url_to_tuple(url):
   throws a InvalidCourseUrlException if the URL cannot be 
   decomposed."""
 
-  try:
     try:
-      url_re = re.search(r'\Ahttps://class.coursera.org/([^/]+)/([^/]+)/(.*\Z)', url)
-      course_id = url_re.group(1)
-      path = url_re.group(2)
-      end = url_re.group(3)
-    except:
-      # not a Coursera URL
-      return None
-      
-    if end.find('?') != -1:
-      # parameters
-      resource, parameters = end.split('?')
-    elif end.find('#') != -1:
-      resource, parameters = end.split('#')
-    else:
-      # no parameters
-      resource = end
-      parameters = None
+        try:
+            url_re = re.search(r'\Ahttps://class.coursera.org/([^/]+)/([^/]+)/(.*\Z)', url)
+            course_id = url_re.group(1)
+            path = url_re.group(2)
+            end = url_re.group(3)
+        except:
+            # not a Coursera URL
+            raise InvalidCourseraUrlException("Invalid URL {}".format(url))
 
-    return (course_id, path, resource, parameters)
-    
-  except Exception, e:
-    # return InvalidCourseUrlException if URL cannot be decomposed
-    return 'InvalidCourseUrlException'
+        if end.find('?') != -1:
+            # parameters
+            resource, parameters = end.split('?')
+        elif end.find('#') != -1:
+            resource, parameters = end.split('#')
+        else:
+            # no parameters
+            resource = end
+            parameters = None
+
+        return (course_id, path, resource, parameters)
+
+    except Exception, e:
+        # return InvalidCourseUrlException if URL cannot be decomposed
+        raise InvalidCourseraUrlException(e.value)
+
 
 '''
 test_cases = []
