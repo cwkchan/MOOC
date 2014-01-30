@@ -30,7 +30,7 @@ def clean(name):
   guesses for each name value and an indication of how confident the cleaning
   process was.
   """
-  name = str(name) #since pandas might pass in numbers as ints
+  name = str(name) # since pandas might pass in numbers as ints
   name = name.lower()
   name = re.sub(r'\.', '', name).strip()       # remove .'s
   name = re.sub(r'[\s]+', ' ', name).strip()   # remove multiple \s
@@ -48,14 +48,14 @@ def clean(name):
   for surname_prefix in surname_prefixes:
     if re.match(r'\A.*\s('+surname_prefix+')\s.*\Z', name):
       name_re = re.search(r'\A(.*)\s(('+surname_prefix+')\s.*)\Z', name)
-      values = (name_re.group(1),'',name_re.group(2), 1)
+      values = (name_re.group(1),'',name_re.group(2), 0.5)
       surname_prefix_found = True
       break
 
   if surname_prefix_found == False:
     if re.match(r'\A[^\s]+\Z', name):
       # first (no \s)
-      values = (name, None, None, 1)
+      values = (name, None, None, 0.5)
     elif re.match(r'\A[^\s]+[\s][^\s]+\Z', name):
       # first + last (split on \s)
       name_re = re.search(r'\A([^\s]+)[\s]([^\s]+)\Z', name)
