@@ -17,7 +17,6 @@ import argparse
 import pandas as pd
 from os import listdir
 from util.config import *
-from names.clean_names import *
 
 parser = argparse.ArgumentParser(description='Copy hg_assessment_sections tables from csv to SQL database.')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
@@ -26,11 +25,10 @@ group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('--dir', help='A directory with CSV files in it')
 args = parser.parse_args()
 
-logger = get_logger("coursera_clickstream.py",args.verbose)
 conn = get_connection()
 
 if (args.clean):
-  query="""DROP TABLE IF EXISTS coursera_map_hg_assessment_sections;"""
+  query="""DROP TABLE IF EXISTS `coursera_map_hg_assessment_sections`;"""
   try:
     conn.execute(query)
   except:
@@ -52,7 +50,7 @@ except:
   pass
 
 # Check which sessions are already in the database
-query = """SELECT DISTINCT session_id FROM coursera_map_hg_assessment_sections;"""
+query = """SELECT DISTINCT `session_id` FROM `coursera_map_hg_assessment_sections`;"""
 existing = []
 for row in conn.execute(query):
   existing.append(str(row['session_id']))
@@ -61,5 +59,5 @@ for csv in listdir(args.dir):
   session_id = filename_to_schema(csv)
   if session_id not in existing:
     df = pd.io.parsers.read_csv(args.dir+'/'+csv)
-    df['session_id'] = filename_to_schema(csv)
+    df['session_id'] = session_id
     pd.io.sql.write_frame(df, 'coursera_map_hg_assessment_sections', conn.raw_connection(), flavor='mysql', if_exists='append')
