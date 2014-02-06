@@ -17,7 +17,6 @@ import argparse
 import pandas as pd
 from os import listdir
 from util.config import *
-from names.clean_names import *
 
 parser = argparse.ArgumentParser(description='Copy Qualtrics survey responses from csv to SQL database.')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
@@ -26,12 +25,12 @@ group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('--dir', help='A directory with CSV files in it')
 args = parser.parse_args()
 
-logger = get_logger("coursera_clickstream.py",args.verbose)
+logger = get_logger("coursera_qualtrics_surveys.py",args.verbose)
 conn = get_connection("qualtrics_surveys")
 
 if (args.clean):
-  query = """DROP TABLE IF EXISTS question_index;"""
   try:
+    query = """DROP TABLE IF EXISTS question_index;"""
     conn.execute(query)
   except:
     pass
@@ -82,7 +81,57 @@ for csv in listdir(args.dir):
     question_index_df = pd.DataFrame(question_index)
     pd.io.sql.write_frame(question_index_df, 'question_index', conn.raw_connection(), flavor='mysql', if_exists='append')
 
-    # Write survey_responses to table    
+    # Write survey_responses to table
+    if (args.clean):
+      try:
+        query = """DROP TABLE IF EXISTS `%s`;""" % session_id
+        conn.execute(query)
+      except:
+        pass
+
+    try:
+      query = 'CREATE TABLE IF NOT EXISTS `'+session_id+'` ('
+      varchar_list = ['V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','user_id','demo']
+      for q in question_index:
+        if any(q['question'] in f for f in varchar_list):
+          query += '`'+q['question']+'` VARCHAR(255) DEFAULT NULL, '
+        else:
+          query += '`'+q['question']+'` MEDIUMTEXT CHARACTER SET utf32 DEFAULT NULL, '
+      query += 'PRIMARY KEY (V1)'
+      query += ') ENGINE=InnoDB DEFAULT CHARSET=latin1;'
+
+      conn.execute(query)
+    except:
+      pass
+
+    try:
+      query = """INSERT INTO `%s` (""" % session_id
+      for q in question_index:
+        query += '`'+q['question']+'`,'
+      query = query[:-1]+') VALUES '
+      for index, row in df.iterrows():
+        query += '('
+        for q in question_index:
+          try:
+            response_str = str(row[q['question']])
+            response_str = response_str.replace('"',"\'")
+            response_str = response_str.replace('%',' percent')
+            response_str = response_str.replace('\xF0\x9F\x98\x8A','')
+            if response_str=='nan':
+              query += 'NULL,'
+            else:
+              query += '"'+response_str+'",'
+          except:
+            query += 'NULL,'
+        query = query[:-1]+'),'
+      query = query[:-1]
+
+      conn.execute(query)
+    except Exception, e:
+        print e
+
+    '''
+    # Write survey_responses to table
     if (args.clean):
       query = """DROP TABLE IF EXISTS `%s`;""" % session_id
       try:
@@ -105,3 +154,4 @@ for csv in listdir(args.dir):
       pass
 
     #pd.io.sql.write_frame(df, '`'+session_id+'`', conn.raw_connection(), flavor='mysql', if_exists='append')
+    '''
