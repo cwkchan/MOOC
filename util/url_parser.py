@@ -27,18 +27,9 @@ class InvalidCourseraUrlException(Exception):
 
 logger = get_logger("url_parser.py")
 
-
-def get_params(params):
-    param_list = {}
-    for param in params.split('&amp;'):
-        param, val = param.split('=')
-        param_list[param] = val
-    return param_list
-
-
 def url_to_tuple(url):
-    """Takes a coursera resource url and returns a tuple
-  (course_id,path,resource,parameters), e.g. 
+  """Takes a coursera resource url and returns a tuple 
+  (session_id,path,resource,parameters), e.g. 
   'https://class.coursera.org/sna-002/forum/list?forum_id=2' 
   would be returned as ("sna-002","forum","list","forum_id=2").  
   Path parameters do not include leading or trailing slashes. 
@@ -46,49 +37,38 @@ def url_to_tuple(url):
   throws a InvalidCourseUrlException if the URL cannot be 
   decomposed."""
 
+  if url[0]=='"':
+    url = url[1:]
+    if url[-1]=='"':
+      url = url[:-1]
+  url = url.strip()
+
+  try:
+    url_re = re.search(r'\A(http|https)://(accounts|class|www).coursera.org/(.*)', url)
+    decompose = url_re.group(3)
+
     try:
-        try:
-            url_re = re.search(r'\Ahttps://class.coursera.org/([^/]+)/([^/]+)/(.*\Z)', url)
-            course_id = url_re.group(1)
-            path = url_re.group(2)
-            end = url_re.group(3)
-        except:
-            # not a Coursera URL
-            raise InvalidCourseraUrlException("Invalid URL {}".format(url))
+      decompose_re = re.search(r'\A([^/]+)/([^/]+)/(.*)\Z', decompose)      
+      session_id = decompose_re.group(1)
+      path = decompose_re.group(2)
+      end = decompose_re.group(3)
+        
+      if end.find('?') != -1:
+        # parameters
+        resource, parameters = end.split('?',1)
+      elif end.find('#') != -1:
+        resource, parameters = end.split('#',1)
+      else:
+        # no parameters
+        resource = end
+        parameters = None
 
-        if end.find('?') != -1:
-            # parameters
-            resource, parameters = end.split('?')
-        elif end.find('#') != -1:
-            resource, parameters = end.split('#')
-        else:
-            # no parameters
-            resource = end
-            parameters = None
-
-        return (course_id, path, resource, parameters)
-
+      return (session_id, path, resource, parameters)
+    
     except Exception, e:
-        # return InvalidCourseUrlException if URL cannot be decomposed
-        raise InvalidCourseraUrlException(e.value)
-
-
-'''
-test_cases = []
-test_cases.append('https://class.coursera.org/sna-002/lecture/view?lecture_id=2')
-test_cases.append('https://class.coursera.org/sna-002/lecture/view?lecture_id=75&amp;preview=1')
-test_cases.append('https://class.coursera.org/sna-002/lecture/9')
-test_cases.append('https://class.coursera.org/sna-002/forum/thread?thread_id=976')
-test_cases.append('https://class.coursera.org/sna-002/forum/list?forum_id=2')
-test_cases.append('https://class.coursera.org/sna-002/forum/index#blahblah')
-test_cases.append('https://class.coursera.org/sna-002/class/index')
-test_cases.append('https://class.coursera.org/sna-002/class/preferences')
-test_cases.append('https://class.coursera.org/sna-002/wiki/view?id=blah')
-test_cases.append('http://www.google.com/')
-test_cases.append('http://www.coursera.org/')
-test_cases.append('https://class.coursera.org/sna-002/class/preferences?preferences?')
-test_cases.append('https://class.coursera.org/sna-002/forum/index#forum-threads-all-0-state-page_num=39')
-
-for case in test_cases:
-  print url_to_tuple(case)
-'''
+      # return InvalidCourseUrlException if URL cannot be decomposed
+      raise InvalidCourseraUrlException(e.value)
+    
+  except Exception, e:
+    # not a Coursera URL
+    raise InvalidCourseraUrlException("Invalid URL {}".format(url))
