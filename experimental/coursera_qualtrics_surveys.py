@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 #    Copyright (C) 2013  The Regents of the University of Michigan
 #
 #    This program is free software: you can redistribute it and/or modify
@@ -15,6 +17,7 @@
 
 import argparse
 import pandas as pd
+import re
 from os import listdir
 from util.config import *
 
@@ -48,6 +51,38 @@ try:
 except:
   pass
 
+if (args.clean):
+  try:
+    query = """DROP TABLE IF EXISTS question_summary;"""
+    conn.execute(query)
+  except:
+    pass
+
+try:
+  query = """
+    CREATE TABLE IF NOT EXISTS question_summary (
+      session_id VARCHAR(255) NOT NULL,
+      user_id VARCHAR(255) NOT NULL,
+      label VARCHAR(255) NOT NULL,
+      question MEDIUMTEXT CHARACTER SET utf32 DEFAULT NULL,
+      response MEDIUMTEXT CHARACTER SET utf32 DEFAULT NULL,
+      PRIMARY KEY (session_id, user_id, label)
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+    """
+  conn.execute(query)
+except:
+  pass
+question_summary = ['Q1','Q2','Q3','Q4','achieved_goals','materials_syllabus','materials_lecturevideos','materials_invideoquizzes','materials_assessment','materials_forums','work_on_own','work_online_knew','work_online_met','work_inperson_knew','work_inperson_met','workload','difficulty','pacing','time_management','certificate_motivation','perform_better_academic','perform_better_work','pursue_topic','problem_solving','confidence_learning','mention_employers','mention_education']
+
+# Attempt to get coursera_qualtrics_map definitions
+try:
+  df = pd.io.parsers.read_csv('coursera_qualtrics_map.csv')
+  coursera_qualtrics_map = {}
+  for index, row in df.iterrows():
+    coursera_qualtrics_map[row[0].replace('\x92','').replace('\xa0','')] = row[1]
+except:
+  pass
+
 # Check which sessions are already in the database
 query = """SELECT DISTINCT session_id FROM question_index;"""
 existing = []
@@ -67,15 +102,27 @@ for csv in listdir(args.dir):
     except:
       pass
 
+    # Rename fields based on coursera_qualtrics_map definitions
+    try:
+      for i, field in enumerate(df.ix[0]):
+        question = str(field)
+        question_clean = re.sub(r'[^a-zA-Z\<\>\s][^a-zA-Z\<\>\s] / ',' / ',question).replace('’','')
+        if question_clean in coursera_qualtrics_map:
+          df = df.rename(columns = {df.columns[i]:coursera_qualtrics_map[question_clean]})
+    except:
+      pass
+
     # Extract question_text and add to question_index
     question_index = []
+    question_map = {}
     header = df[:1]
     df = df.drop(df.index[:1])
     for i, field in enumerate(header.ix[0]):
-      question = str(header.columns[i]) #.replace('\xEF\xBB\xBFV1', 'V1')
+      question = str(header.columns[i])
       question_text = str(field)
       if question.find('Unnamed: ') == -1:
         question_index.append({'session_id':session_id, 'question':question, 'question_text':question_text})
+        question_map[question] = question_text
       else:
         del df[question]
     question_index_df = pd.DataFrame(question_index)
@@ -89,15 +136,18 @@ for csv in listdir(args.dir):
       except:
         pass
 
+    # Remove duplicate user responses
+    df = df.drop_duplicates(cols='user_id', take_last=True)
+
     try:
       query = 'CREATE TABLE IF NOT EXISTS `'+session_id+'` ('
-      varchar_list = ['V1','V2','V3','V4','V5','V6','V7','V8','V9','V10','user_id','demo']
+      varchar_list = ['ResponseID','ResponseSet','Name','ExternalDataReference','EmailAddress','IPAddress','Status','StartDate','EndDate','Finished','user_id','demo']
       for q in question_index:
         if any(q['question'] in f for f in varchar_list):
           query += '`'+q['question']+'` VARCHAR(255) DEFAULT NULL, '
         else:
           query += '`'+q['question']+'` MEDIUMTEXT CHARACTER SET utf32 DEFAULT NULL, '
-      query += 'PRIMARY KEY (V1)'
+      query += 'PRIMARY KEY (`ResponseID`)'
       query += ') ENGINE=InnoDB DEFAULT CHARSET=latin1;'
 
       conn.execute(query)
@@ -128,30 +178,25 @@ for csv in listdir(args.dir):
 
       conn.execute(query)
     except Exception, e:
-        print e
-
-    '''
-    # Write survey_responses to table
-    if (args.clean):
-      query = """DROP TABLE IF EXISTS `%s`;""" % session_id
-      try:
-        conn.execute(query)
-      except:
-        pass
+      print e
 
     try:
-      query = """
-        CREATE TABLE IF NOT EXISTS `%s` (
-          `id` INT NOT NULL AUTO_INCREMENT, """ % session_id
-      for row in question_index:
-        query += """`%s` VARCHAR(255) DEFAULT NULL, """ % row['question']
-      query += """
-          PRIMARY KEY (id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-        """
-      conn.execute(query)
-    except:
-      pass
+      query = 'INSERT INTO `question_summary` (`session_id`,`user_id`,`label`,`question`,`response`) VALUES '
+      for index, row in df.iterrows():
+        for label in question_summary:
+          try:
+            response_str = str(row[label])
+            response_str = response_str.replace('"',"\'")
+            response_str = response_str.replace('%',' percent')
+            response_str = response_str.replace('\xF0\x9F\x98\x8A','')
+            if response_str=='nan':
+              query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'","'+question_map[label]+'",NULL),'
+            else:
+              query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'","'+question_map[label]+'","'+response_str+'"),'
+          except Exception, e:
+            print e
+      query = query[:-1]
 
-    #pd.io.sql.write_frame(df, '`'+session_id+'`', conn.raw_connection(), flavor='mysql', if_exists='append')
-    '''
+      conn.execute(query)
+    except Exception, e:
+      print e
