@@ -53,6 +53,7 @@ for schema_name in schemas:
         print 'Error accessing '+str(schema_name)+' with exception '+str(e)
         continue
 
+    # Engagement numbers
     try:
         query = """SELECT COUNT(DISTINCT(session_user_id))
                    FROM   users;"""
@@ -60,12 +61,12 @@ for schema_name in schemas:
 
         query = """SELECT COUNT(DISTINCT(session_user_id))
                    FROM   lecture_submission_metadata;"""
-        watched_lecture = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+        active = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
 
         query = """SELECT COUNT(DISTINCT(session_user_id))
                    FROM   course_grades
                    WHERE  normal_grade>0;"""
-        attempted_assignment = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+        graded = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
 
         query = """SELECT COUNT(DISTINCT(session_user_id))
                    FROM   course_grades
@@ -73,14 +74,15 @@ for schema_name in schemas:
                       OR  achievement_level='distinction';"""
         statement_of_accomplishment = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
 
-        print '  Users:'
-        print '  '+str(registered)+' registered, '+str(watched_lecture)+' active (i.e., accessed a lecture) ('+str(int(100*1.0*watched_lecture/registered))+'% of registered users)'
-        print '  '+str(attempted_assignment)+' earned a grade >0 ('+str(int(100*1.0*attempted_assignment/watched_lecture))+'% of active users)'
-        print '  '+str(statement_of_accomplishment)+' received a Statement of Accomplishment ('+str(int(100*1.0*statement_of_accomplishment/watched_lecture))+'% of active users)'
+        print '  '+str(registered)+' registered users'
+        print '  '+str(int(100*1.0*active/registered))+'% of registered users were active (i.e., accessed a lecture) ('+str(active)+' total)'
+        print '  '+str(int(100*1.0*graded/active))+'% of active users were graded ('+str(graded)+' total)'
+        print '  '+str(int(100*1.0*statement_of_accomplishment/active))+'% of active users earned a Statement of Accomplishment ('+str(statement_of_accomplishment)+' total)'
         print ''
-    except:
+    except Exception, e::
         pass
 
+    # Lecture submissions
     try:
         start_date = coursera_index.loc[schema_name,'start']
         start_timestamp = int(time.mktime(time.strptime(start_date, '%m/%d/%Y'))) - time.timezone
@@ -94,26 +96,40 @@ for schema_name in schemas:
                    FROM   lecture_submission_metadata
                    WHERE  submission_time>=%s
                      AND  action='view'""" % str(start_timestamp)
-        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection()))
+        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection())['submission_time'].values)
         query = """SELECT submission_time
                    FROM   lecture_submission_metadata
                    WHERE  submission_time>=%s
                      AND  action='download'""" % str(start_timestamp)
-        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection()))
+        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection())['submission_time'].values)
+        end_timestamp = max([max(lecture_submissions[0]), max(lecture_submissions[1])])
+        days = np.ceil(1.0*(end_timestamp - start_timestamp)/86400)
+        weeks = np.ceil(1.0*(end_timestamp - start_timestamp)/604800)
 
         # Plot lecture submissions over time, colored by views/downloads
         plt.figure()
+        plt.subplot(2, 1, 1)
         for timestamp in timestamps:
             plt.axvline(x=timestamp, color='#999999')
-        n, bins, patches = plt.hist(lecture_submissions, 100, histtype='bar', stacked=True, color=['#0d57aa','#ffcb0b'], label=['Views','Downloads'])
+        n, bins, patches = plt.hist(lecture_submissions, weeks, histtype='bar', stacked=True, color=['#0d57aa','#ffcb0b'], label=['Views','Downloads'])
         plt.legend()
-        plt.title('Lecture Submissions Over Time')
+        plt.title('Lecture Submissions by Week')
+        plt.xlabel('Date')
+        plt.ylabel('Count')
+
+        plt.subplot(2, 1, 2)
+        for timestamp in timestamps:
+            plt.axvline(x=timestamp, color='#999999')
+        n, bins, patches = plt.hist(lecture_submissions, days, histtype='bar', stacked=True, color=['#0d57aa','#ffcb0b'], label=['Views','Downloads'])
+        plt.legend()
+        plt.title('Lecture Submissions by Day')
         plt.xlabel('Date')
         plt.ylabel('Count')
 
     except Exception, e:
-        print e
+        pass
 
+    # Course grades
     try:
         query = """SELECT session_user_id,normal_grade,achievement_level FROM course_grades WHERE normal_grade>0"""
         course_grades = pd.io.sql.read_frame(query, schemaconn.raw_connection())
@@ -155,7 +171,7 @@ for schema_name in schemas:
             query = """SELECT MIN(normal_grade) AS accomplishment_grade
                        FROM   course_grades
                        WHERE  achievement_level='normal'"""
-            accomplishment_grade = pd.io.sql.read_frame(query, schemaconn.raw_connection())
+            accomplishment_grade = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
         except Exception, e:
             print e
 
@@ -169,7 +185,7 @@ for schema_name in schemas:
         labels[time_len-1] = 'Beyond'
         plt.figure()
         n, bins, patches = plt.hist(grades_by_time, 100, histtype='bar', stacked=True, color=colors, label=labels)
-        plt.axvline(x=accomplishment_grade.ix[0,0], color='#999999')
+        plt.axvline(x=accomplishment_grade, color='#999999')
         plt.legend(title='Last lecture view')
         plt.title('Distribution of Course Grades')
         plt.xlabel('Grade')
@@ -184,7 +200,6 @@ for schema_name in schemas:
         print ''
 
     except Exception, e:
-        print e
-        continue
+        pass
 
     plt.show()
