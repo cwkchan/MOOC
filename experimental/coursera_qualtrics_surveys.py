@@ -64,7 +64,6 @@ try:
       session_id VARCHAR(255) NOT NULL,
       user_id VARCHAR(255) NOT NULL,
       label VARCHAR(255) NOT NULL,
-      question MEDIUMTEXT CHARACTER SET utf32 DEFAULT NULL,
       response MEDIUMTEXT CHARACTER SET utf32 DEFAULT NULL,
       PRIMARY KEY (session_id, user_id, label)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
@@ -72,7 +71,19 @@ try:
   conn.execute(query)
 except:
   pass
-question_summary = ['Q1','Q2','Q3','Q4','achieved_goals','materials_syllabus','materials_lecturevideos','materials_invideoquizzes','materials_assessment','materials_forums','work_on_own','work_online_knew','work_online_met','work_inperson_knew','work_inperson_met','workload','difficulty','pacing','time_management','certificate_motivation','perform_better_academic','perform_better_work','pursue_topic','problem_solving','confidence_learning','mention_employers','mention_education']
+
+#question_summary = ['Q1','Q2','Q3','Q4','achieved_goals','materials_syllabus','materials_lecturevideos','materials_invideoquizzes','materials_assessment','materials_forums','work_on_own','work_online_knew','work_online_met','work_inperson_knew','work_inperson_met','workload','difficulty','pacing','time_management','certificate_motivation','perform_better_academic','perform_better_work','pursue_topic','problem_solving','confidence_learning','mention_employers','mention_education']
+question_summary = ['achieved_goals','certificate_motivation','comments_TEXT','comm_blogs','comm_email','comm_fellow_students','comm_inperson','comm_other','comm_other_TEXT','comm_socialnetwork','comm_textmsg','comm_why_TEXT','compare_facetoface_TEXT','compare_online_TEXT','confidence_learning','difficulty','EmailAddress','EndDate','ExternalDataReference','Finished','hours_per_week','instructor_connection','IPAddress','like_best_TEXT','like_least_TEXT','LocationAccuracy','LocationLatitude','LocationLongitude','materials_assessment','materials_forums','materials_invideoquizzes','materials_lecturevideos','materials_syllabus','mention_education','mention_employers','meta_browser','meta_flash','meta_java','meta_os','meta_screenres','meta_useragent','meta_version','Name','pacing','perform_better_academic','perform_better_work','problem_solving','pursue_topic','Q1','Q2','Q3','Q4','recommend_to_friend','resources_forums','resources_lectureslides','resources_lecturevideos','resources_other','resources_other_TEXT','resources_peersnotes','resources_personalnotes','resources_recommendedtexts','ResponseID','ResponseSet','revisit_materials','StartDate','Status','stopped_participating','stopped_participating_TEXT','take_again_course','take_again_institution','take_again_instructor','take_again_um','time_management','user_id','welcome','workload','work_inperson_knew','work_inperson_met','work_online_knew','work_online_met','work_on_own']
+
+# Remove Qualtrics metadata fields
+skip = ['question','ResponseID','ResponseSet','Name','ExternalDataReference','EmailAddress','Status','StartDate','EndDate','Finished','meta_browser','meta_version','meta_os','meta_screenres','meta_flash','meta_java','meta_useragent','welcome']
+for question in skip:
+    if question in question_summary:
+        question_summary.remove(question)
+# Remove text fields
+for question in question_summary:
+    if question.find('_TEXT') != -1:
+        question_summary.remove(question)
 
 # Attempt to get coursera_qualtrics_map definitions
 try:
@@ -181,7 +192,8 @@ for csv in listdir(args.dir):
       print e
 
     try:
-      query = 'INSERT INTO `question_summary` (`session_id`,`user_id`,`label`,`question`,`response`) VALUES '
+      query = 'INSERT INTO `question_summary` (`session_id`,`user_id`,`label`,`response`) VALUES '
+      #query = 'INSERT INTO `question_summary` (`session_id`,`user_id`,`label`,`question`,`response`) VALUES '
       for index, row in df.iterrows():
         for label in question_summary:
           try:
@@ -190,9 +202,11 @@ for csv in listdir(args.dir):
             response_str = response_str.replace('%',' percent')
             response_str = response_str.replace('\xF0\x9F\x98\x8A','')
             if response_str=='nan':
-              query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'","'+question_map[label]+'",NULL),'
+              query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'",NULL),'
+              #query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'","'+question_map[label]+'",NULL),'
             else:
-              query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'","'+question_map[label]+'","'+response_str+'"),'
+              query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'","'+response_str+'"),'
+              #query += '("'+session_id+'","'+str(row['user_id']).replace('%','')+'","'+label+'","'+question_map[label]+'","'+response_str+'"),'
           except Exception, e:
             print e
       query = query[:-1]
