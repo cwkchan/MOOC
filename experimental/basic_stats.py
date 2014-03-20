@@ -54,6 +54,34 @@ for schema_name in schemas:
         continue
 
     try:
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   users;"""
+        registered = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   lecture_submission_metadata;"""
+        watched_lecture = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   course_grades
+                   WHERE  normal_grade>0;"""
+        attempted_assignment = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   course_grades
+                   WHERE  achievement_level='normal'
+                      OR  achievement_level='distinction';"""
+        statement_of_accomplishment = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        print '  Users:'
+        print '  '+str(registered)+' registered, '+str(watched_lecture)+' active (i.e., accessed a lecture) ('+str(int(100*1.0*watched_lecture/registered))+'% of registered users)'
+        print '  '+str(attempted_assignment)+' earned a grade >0 ('+str(int(100*1.0*attempted_assignment/watched_lecture))+'% of active users)'
+        print '  '+str(statement_of_accomplishment)+' received a Statement of Accomplishment ('+str(int(100*1.0*statement_of_accomplishment/watched_lecture))+'% of active users)'
+        print ''
+    except:
+        pass
+
+    try:
         start_date = coursera_index.loc[schema_name,'start']
         start_timestamp = int(time.mktime(time.strptime(start_date, '%m/%d/%Y'))) - time.timezone
         duration = int(coursera_index.loc[schema_name,'duration'])
@@ -93,7 +121,7 @@ for schema_name in schemas:
 
         for i in range(len(timestamps)):
             start = timestamps[i]
-            try:
+            if i < len(timestamps) - 1:
                 end = timestamps[i+1]
                 query = """SELECT course_grades.session_user_id
                                 , normal_grade
@@ -108,7 +136,7 @@ for schema_name in schemas:
                            WHERE normal_grade>0
                              AND last_submission_time>=%s
                              AND last_submission_time<%s""" % (start, end)
-            except:
+            else:
                 query = """SELECT course_grades.session_user_id
                                 , normal_grade
                                 , last_submission_time
@@ -160,9 +188,3 @@ for schema_name in schemas:
         continue
 
     plt.show()
-
-    #plt.subplot(211)
-    #plt.hist(course_grades['normal_grade'], 100)
-    #plt.subplot(212)
-    #plt.hist(achievement_grades['normal_grade'], 100)
-    #plt.show()
