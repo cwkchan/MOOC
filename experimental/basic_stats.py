@@ -53,6 +53,36 @@ for schema_name in schemas:
         print 'Error accessing '+str(schema_name)+' with exception '+str(e)
         continue
 
+    # Engagement numbers
+    try:
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   users;"""
+        registered = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   lecture_submission_metadata;"""
+        active = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   course_grades
+                   WHERE  normal_grade>0;"""
+        graded = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        query = """SELECT COUNT(DISTINCT(session_user_id))
+                   FROM   course_grades
+                   WHERE  achievement_level='normal'
+                      OR  achievement_level='distinction';"""
+        statement_of_accomplishment = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
+
+        print '  '+str(registered)+' registered users'
+        print '  '+str(int(100*1.0*active/registered))+'% of registered users were active (i.e., accessed a lecture) ('+str(active)+' total)'
+        print '  '+str(int(100*1.0*graded/active))+'% of active users were graded ('+str(graded)+' total)'
+        print '  '+str(int(100*1.0*statement_of_accomplishment/active))+'% of active users earned a Statement of Accomplishment ('+str(statement_of_accomplishment)+' total)'
+        print ''
+    except Exception, e:
+        pass
+
+    # Lecture submissions
     try:
         start_date = coursera_index.loc[schema_name,'start']
         start_timestamp = int(time.mktime(time.strptime(start_date, '%m/%d/%Y'))) - time.timezone
@@ -65,87 +95,101 @@ for schema_name in schemas:
         query = """SELECT submission_time
                    FROM   lecture_submission_metadata
                    WHERE  submission_time>=%s
-                     AND  action='view'""" % str(start_timestamp)
-        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection()))
+                     AND  action='view';""" % str(start_timestamp)
+        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection())['submission_time'].values)
         query = """SELECT submission_time
                    FROM   lecture_submission_metadata
                    WHERE  submission_time>=%s
-                     AND  action='download'""" % str(start_timestamp)
-        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection()))
+                     AND  action='download';""" % str(start_timestamp)
+        lecture_submissions.append(pd.io.sql.read_frame(query, schemaconn.raw_connection())['submission_time'].values)
+        end_timestamp = max([max(lecture_submissions[0]), max(lecture_submissions[1])])
+        days = np.ceil(1.0*(end_timestamp - start_timestamp)/86400)
+        weeks = np.ceil(1.0*(end_timestamp - start_timestamp)/604800)
 
         # Plot lecture submissions over time, colored by views/downloads
         plt.figure()
+        plt.subplot(2, 1, 1)
         for timestamp in timestamps:
             plt.axvline(x=timestamp, color='#999999')
-        n, bins, patches = plt.hist(lecture_submissions, 100, histtype='bar', stacked=True, color=['#0d57aa','#ffcb0b'], label=['Views','Downloads'])
+        n, bins, patches = plt.hist(lecture_submissions, weeks, histtype='bar', stacked=True, color=['#0d57aa','#ffcb0b'], label=['Views','Downloads'])
         plt.legend()
-        plt.title('Lecture Submissions Over Time')
+        plt.title('Lecture Submissions by Week ('+str(schema_name)+')')
         plt.xlabel('Date')
         plt.ylabel('Count')
 
+        plt.subplot(2, 1, 2)
+        for timestamp in timestamps:
+            plt.axvline(x=timestamp, color='#999999')
+        n, bins, patches = plt.hist(lecture_submissions, days, histtype='bar', stacked=True, color=['#0d57aa','#ffcb0b'], label=['Views','Downloads'])
+        plt.legend()
+        plt.title('Lecture Submissions by Day ('+str(schema_name)+')')
+        plt.xlabel('Date')
+        plt.ylabel('Count')
     except Exception, e:
-        print e
+        pass
 
+    # Course grades
     try:
-        query = """SELECT session_user_id,normal_grade,achievement_level FROM course_grades WHERE normal_grade>0"""
-        course_grades = pd.io.sql.read_frame(query, schemaconn.raw_connection())
-        grades_by_time = []
+        query = """SELECT MIN(normal_grade) AS accomplishment_grade
+                   FROM   course_grades
+                   WHERE  achievement_level='normal'"""
+        accomplishment_grade = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
 
-        for i in range(len(timestamps)):
-            start = timestamps[i]
-            try:
-                end = timestamps[i+1]
-                query = """SELECT course_grades.session_user_id
-                                , normal_grade
-                                , last_submission_time
-                           FROM   course_grades
-                                  LEFT JOIN
-                                     (SELECT session_user_id
-                                           , MAX(submission_time) AS last_submission_time
-                                      FROM   lecture_submission_metadata
-                                      GROUP BY session_user_id) lecture_submissions
-                                  ON course_grades.session_user_id=lecture_submissions.session_user_id
-                           WHERE normal_grade>0
-                             AND last_submission_time>=%s
-                             AND last_submission_time<%s""" % (start, end)
-            except:
-                query = """SELECT course_grades.session_user_id
-                                , normal_grade
-                                , last_submission_time
-                           FROM   course_grades
-                                  LEFT JOIN
-                                     (SELECT session_user_id
-                                           , MAX(submission_time) AS last_submission_time
-                                      FROM   lecture_submission_metadata
-                                      GROUP BY session_user_id) lecture_submissions
-                                  ON course_grades.session_user_id=lecture_submissions.session_user_id
-                           WHERE normal_grade>0
-                             AND last_submission_time>=%s""" % start
-            grades_by_time.append(pd.io.sql.read_frame(query, schemaconn.raw_connection())['normal_grade'].values)
+        query = """SELECT MAX(temp.lectures_viewed) AS lecture_total
+                   FROM   (
+                          SELECT COUNT(DISTINCT(item_id)) AS lectures_viewed
+                          FROM   lecture_submission_metadata
+                          GROUP BY session_user_id
+                          ) temp;"""
+        lecture_total = pd.io.sql.read_frame(query, schemaconn.raw_connection()).ix[0,0]
 
-        try:
-            query = """SELECT MIN(normal_grade) AS accomplishment_grade
-                       FROM   course_grades
-                       WHERE  achievement_level='normal'"""
-            accomplishment_grade = pd.io.sql.read_frame(query, schemaconn.raw_connection())
-        except Exception, e:
-            print e
+        query = """SELECT course_grades.session_user_id
+                        , course_grades.normal_grade
+                        , lecture_submissions.lectures_viewed
+                   FROM   course_grades
+                          LEFT JOIN (
+                               SELECT session_user_id
+                                     , 100*COUNT(DISTINCT(item_id))/%s AS lectures_viewed
+                               FROM   lecture_submission_metadata
+                               GROUP BY session_user_id) lecture_submissions
+                          ON course_grades.session_user_id=lecture_submissions.session_user_id
+                   WHERE course_grades.normal_grade > 0;""" % lecture_total
+        lectures_viewed = pd.io.sql.read_frame(query, schemaconn.raw_connection())
 
-        # Plot course grade distribution, colored by last lecture submission
-        colors = []
+        grades_by_lectures_viewed = []
+        bin_width = 10
+        bin_start = 0
+        bin_end = 0
         labels = []
-        time_len = len(grades_by_time)
-        for i in range(time_len):
-            colors.append((float(i)/time_len,0.2,1-float(i)/time_len))
-            labels.append('Week '+str(i+1))
-        labels[time_len-1] = 'Beyond'
+        while bin_end < 100:
+            bin_start = bin_end
+            bin_end += bin_width
+            if bin_end < 100:
+                grades_by_lectures_viewed.append( lectures_viewed.loc[(lectures_viewed['lectures_viewed']>=bin_start) & (lectures_viewed['lectures_viewed']<bin_end),'normal_grade'].values )
+                labels.append(str(bin_start)+'-'+str(bin_end)+'%')
+            else:
+                grades_by_lectures_viewed.append( lectures_viewed.loc[(lectures_viewed['lectures_viewed']>=bin_start) & (lectures_viewed['lectures_viewed']<=bin_end),'normal_grade'].values )
+                labels.append(str(bin_start)+'-'+str(bin_end)+'%')
+
+       # Plot course grade distribution, colored by percent of lectures viewed
+        colors = []
+        bin_num = 100/bin_width
+        for i in range(bin_num):
+            colors.append((float(i)/bin_num,0.2,1-float(i)/bin_num))
         plt.figure()
-        n, bins, patches = plt.hist(grades_by_time, 100, histtype='bar', stacked=True, color=colors, label=labels)
-        plt.axvline(x=accomplishment_grade.ix[0,0], color='#999999')
-        plt.legend(title='Last lecture view')
-        plt.title('Distribution of Course Grades')
+        n, bins, patches = plt.hist(grades_by_lectures_viewed, 100, histtype='bar', stacked=True, color=colors, label=labels)
+        plt.axvline(x=accomplishment_grade, color='#999999')
+        plt.legend(title='% of lectures accessed')
+        plt.title('Distribution of Course Grades ('+str(schema_name)+')')
         plt.xlabel('Grade')
         plt.ylabel('Count')
+
+        query = """SELECT session_user_id
+                        , normal_grade
+                        , achievement_level
+                   FROM   course_grades
+                   WHERE  normal_grade>0"""
+        course_grades = pd.io.sql.read_frame(query, schemaconn.raw_connection())
 
         d,p = scipy.stats.kstest(course_grades['normal_grade'],'norm')
         mean = float(course_grades.mean())
@@ -155,14 +199,24 @@ for schema_name in schemas:
         print '  Kolmogorov-Smirnov: D='+str(d)+', p='+str(p)
         print ''
 
+        '''
+        # Plot course grade distribution, colored by percent of lectures viewed
+        colors = []
+        labels = []
+        time_len = len(grades_by_time)
+        for i in range(time_len):
+            colors.append((float(i)/time_len,0.2,1-float(i)/time_len))
+            labels.append('Week '+str(i+1))
+        labels[time_len-1] = 'Beyond'
+        plt.figure()
+        n, bins, patches = plt.hist(grades_by_time, 100, histtype='bar', stacked=True, color=colors, label=labels)
+        plt.axvline(x=accomplishment_grade, color='#999999')
+        plt.legend(title='Last lecture view')
+        plt.title('Distribution of Course Grades')
+        plt.xlabel('Grade')
+        plt.ylabel('Count')
+        '''
     except Exception, e:
-        print e
-        continue
+        pass
 
     plt.show()
-
-    #plt.subplot(211)
-    #plt.hist(course_grades['normal_grade'], 100)
-    #plt.subplot(212)
-    #plt.hist(achievement_grades['normal_grade'], 100)
-    #plt.show()
