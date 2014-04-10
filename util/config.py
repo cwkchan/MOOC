@@ -12,90 +12,103 @@
 #
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
-
+import Queue
+import threading
+import time
 import mysql.connector
 import ConfigParser
 from sqlalchemy import *
 import logging
 import os
 
+
 def get_properties():
-	"""Returns the list of properties as a dict of key/value pairs in
-	the file config.properties.
-	"""
-	cf = ConfigParser.ConfigParser()
-	cf.read("config.properties")
-	properties={}
-	for section in cf.sections():
-		for item in cf.items(section):
-			properties[item[0]]=item[1]
-	return properties
+    """Returns the list of properties as a dict of key/value pairs in the file config.properties."""
+    cf = ConfigParser.ConfigParser()
+    cf.read("config.properties")
+    properties = {}
+    for section in cf.sections():
+        for item in cf.items(section):
+            properties[item[0]] = item[1]
+    return properties
+
 
 def get_connection(schema=None):
-	"""Returns an sqlalchemy connection object, optionally connecting to
-	a particular schema of interest.  If no schema is used, the one marked
-	as the index in the configuration file will be used.
-	"""
-	config=get_properties()
-	if (schema == None):
-		return create_engine(config["engine"]+config["schema"])
-	return create_engine(config["engine"]+schema)
+    """Returns an sqlalchemy connection object, optionally connecting to a particular schema of interest.  If no schema
+    is used, the one marked as the index in the configuration file will be used. """
+    config = get_properties()
+    if (schema == None):
+        return create_engine(config["engine"] + config["schema"])
+    return create_engine(config["engine"] + schema)
+
 
 def get_coursera_schema_list():
-	"""Returns the list of courses, as db schemas, that should be processed.
-	This list comes from either the configuration file in the schemas section
-	or, if that does not exist, it comes from the coursera_index table.
-	"""
-	config=get_properties()
-	if ("schemas" in config.keys()):
-		return config["schemas"].split(",")
-	
-	query="SELECT id FROM coursera_index WHERE start IS NOT NULL;"
-	conn=get_connection()
-	results=conn.execute(query)
-	schemas=[]
-	for row in results:
-		schemas.append(row["id"].encode('ascii','ignore'))
-	return schemas
+    """Returns the list of courses, as db schemas, that should be processed. This list comes from either the
+    configuration file in the schemas section or, if that does not exist, it comes from the coursera_index table."""
+    config = get_properties()
+    if ("schemas" in config.keys()):
+        return config["schemas"].split(",")
 
-def get_logger(name,verbose=False):
-	"""Returns a logger with the given name at either the debug or info level
-	"""
-	logger = logging.getLogger(name)
-	if verbose:
-		logging.basicConfig(level=logging.DEBUG)
-	else:
-		logging.basicConfig(level=logging.INFO)
-	return logger
+    query = "SELECT id FROM coursera_index WHERE start IS NOT NULL;"
+    conn = get_connection()
+    results = conn.execute(query)
+    schemas = []
+    for row in results:
+        schemas.append(row["id"].encode('ascii', 'ignore'))
+    return schemas
 
-__batch_insert_queue={}
-__batch_size=1000
-def db_batch_insert(connection, table, vals, batch_size=__batch_size):
-	"""Batch inserts a set of values into a given table
-	"""
-	global __batch_insert_queue
-	global __batch_size
-	__batch_size=batch_size
-	#initialize this specific queue if it does not exist
-	key="{}.{}".format(connection.name,table.name)
-	if key not in __batch_insert_queue:
-		__batch_insert_queue[key]=[]
-	#add item to the batch
-	__batch_insert_queue[key].append(vals)
-	if len(__batch_insert_queue[key])>=__batch_size:
-		connection.execute( table.insert().values(__batch_insert_queue[key]) )
-		__batch_insert_queue[key]=[]
 
-def db_batch_cleanup(connection, table):
-	"""Flushes batch files waiting for commit to db"""
-	key="{}.{}".format(connection.name,table.name)
-	if key not in __batch_insert_queue:
-		return
-	if len(__batch_insert_queue[key])>=0:
-		connection.execute( table.insert().values(__batch_insert_queue[key]) )
-		__batch_insert_queue[key]=[]
+def get_logger(name, verbose=False):
+    """Returns a logger with the given name at either the debug or info level"""
+    logger = logging.getLogger(name)
+    if verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+    return logger
+
 
 def filename_to_schema(fn):
-	"""Attempts to turn a filename in the form path\to\course.csv into
-	the value course"""
-	return os.path.basename(fn).split(".")[0]
+    """Attempts to turn a filename in the form path\to\course.csv into the value course"""
+    return os.path.basename(fn).split(".")[0]
+
+
+class ThreadedDBQueue(threading.Thread):
+    """
+    Manages a queue for a given db connection, and table in separate thread.
+    """
+
+    def __init__(self, queue, connection, table, batch_size=1000, log_to_console=False):
+        """
+        queue should be of type Queue.Queue(), connection of type util.config.get_connection() (an SQLAlchemy engine),
+        and table should be an SQLAlchemy table metadata object (e.g. metadata.tables["coursera_clickstream"]).
+        """
+        threading.Thread.__init__(self)
+        self.queue = queue
+        self.connection = connection
+        self.table = table
+        self.close = False
+        self.batch_size = batch_size
+        self.log_to_console = log_to_console
+
+    def stop(self):
+        """
+        Indicates that the ThreadedDBQueue should shutdown after it has emptied its queue.
+        """
+        self.close = True
+
+
+    def run(self):
+        """
+        Start the ThreadedDBQueue running, inserting up to batch_size items at once.
+        """
+        while (not self.close) or self.queue.qsize() > 0:
+            items = []
+            for item_num in range(0, self.batch_size):
+                try:
+                    items.append(self.queue.get_nowait())
+                except Queue.Empty:
+                    continue
+            if self.log_to_console:
+                print("{} items being put in db for table {}, {} remain in queue.".format(len(items), self.table, self.queue.qsize()))
+            self.connection.execute(self.table.insert().values(items))

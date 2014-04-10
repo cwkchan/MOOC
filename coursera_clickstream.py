@@ -13,6 +13,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
+import Queue
 import argparse
 from util.config import *
 from util.url_parser import *
@@ -25,53 +26,55 @@ from os import listdir
 
 def __json_parser(js):
     """This inserts the data into the coursera_clickstream table in batch form."""
-    global conn, tbl_coursera_clickstream
+    global queue
     js = __value_parser(js)
     js = __url_parser(js)
-    db_batch_insert(conn, tbl_coursera_clickstream, js)
+    js = __flatten_lists(js)
+    queue.put(js)
+
+
+def __flatten_lists(js, keys=['12', '13', '14']):
+    """for each js[key] in keys it calls str()"""
+    for key in keys:
+        if key in js:
+            js[key] = str(js[key])
+    return js
 
 
 def __url_parser(js):
-    """Parses out a coursera resource access and puts it in table
-    coursera_clickstream_url.  Foreign key is returned as js['url']"""
-    global conn, tbl_coursera_clickstream_url
-    if "page_url" not in js.keys() or js["page_url"] == "" or js["page_url"] is None:
-        js["url"] = None
-        return js
-    try:
-        url_info = {}
-        url_info["course_id"], url_info["path"], url_info["resource"], url_info["parameters"] = url_to_tuple(
-            js["page_url"])
-        rs = conn.execute(tbl_coursera_clickstream_url.insert().values(url_info))
-        #set our foreign key relationship
-        js["url"] = rs.inserted_primary_key[0]
-    except InvalidCourseraUrlException, e1:
-        logger.warn("Url {} is not detected as a Coursera clickstream URL".format(e1.value))
-        js["url"] = None
-    except Exception, e:
-        logger.warn("Exception {} from line {}".format(e, js["page_url"]))
+    """Parses out a coursera resource access as js["page_url"] and puts it in columns prepended with 'url'"""
+    if not ( "page_url" not in js.keys() or js["page_url"] == "" or js["page_url"] is None):
+        try:
+            url_info = {}
+            course, url_info["url_path"], url_info["url_resource"], url_info["url_parameters"] = url_to_tuple(
+                js["page_url"])
+            #rs = conn.execute(tbl_coursera_clickstream_url.insert().values(url_info))
+            #set our foreign key relationship
+            #js["url"] = rs.inserted_primary_key[0]
+        except InvalidCourseraUrlException, e1:
+            logger.warn("Url {} is not detected as a Coursera clickstream URL".format(e1.value))
+            #js["url"] = None
+        except Exception, e:
+            logger.warn("Exception {} from line {}".format(e, js["page_url"]))
     return js
 
 
 def __value_parser(js):
-    """Parses the value field which should be json. This inserts data into
-    the coursera_clickstream_value table and returns the key as js['value']."""
-    global conn, tbl_coursera_clickstream_value
-    if "value" not in js.keys() or js["value"] == "" or js["value"] == None or js["value"] == "{}":
-        js["value"] = None
-        return js
-    try:
-        nested_js = ujson.loads(js["value"].encode('ascii', 'ignore'))
-        #this is a workaround since some fields might also be nested
-        for key in nested_js.keys():
-            if nested_js[key] != None:
-                nested_js[key] = str(nested_js[key])
-        rs = conn.execute(tbl_coursera_clickstream_value.insert().values(nested_js))
-        #set our foreign key relationship
-        js["value"] = rs.inserted_primary_key[0]
-        return js
-    except Exception, e:
-        logger.warn("Exception {} from line {}".format(e, js["value"]))
+    """Parses the js["value"] field which should be json.  Results are put into js as top level keys prepended with
+    the string 'val' """
+    if not ("value" not in js.keys() or js["value"] == "" or js["value"] == None or js["value"] == "{}"):
+        try:
+            nested_js = ujson.loads(js["value"].encode('ascii', 'ignore'))
+            #this is a workaround since some fields might also be nested
+            for key in nested_js.keys():
+                if nested_js[key] != None:
+                    nested_js[key] = str(nested_js[key])
+                js["value_{}".format(key)] = nested_js[key]
+        except Exception, e:
+            logger.warn("Exception {} from line {}".format(e, js["value"]))
+    if "value" in js:
+        del js["value"]
+    return js
 
 
 parser = argparse.ArgumentParser(description='Import coursera clickstream data files into the database')
@@ -96,86 +99,64 @@ else:
 
 conn = get_connection()
 
-if (args.clean):
+if args.clean:
     query = "DROP TABLE IF EXISTS coursera_clickstream"
-    try:
-        conn.execute(query)
-    except:
-        pass
-    query = "DROP TABLE IF EXISTS coursera_clickstream_value"
-    try:
-        conn.execute(query)
-    except:
-        pass
-    query = "DROP TABLE IF EXISTS coursera_clickstream_url"
     try:
         conn.execute(query)
     except:
         pass
 
     query = """CREATE TABLE `coursera_clickstream` (
-        `12` varchar(64) DEFAULT NULL,
-        `13` varchar(8) DEFAULT NULL,
-        `14` text DEFAULT NULL,
-        `client` varchar(32) DEFAULT NULL,
+      `12` varchar(64) DEFAULT NULL,
+      `13` varchar(8) DEFAULT NULL,
+      `14` text DEFAULT NULL,
+      `client` varchar(32) DEFAULT NULL,
       `from` text DEFAULT NULL,
-        `id` varchar(255) DEFAULT NULL,
+      `id` varchar(255) DEFAULT NULL,
       `key` varchar(64) DEFAULT NULL,
       `language` text DEFAULT NULL,
       `page_url` text DEFAULT NULL,
       `pk` bigint NOT NULL AUTO_INCREMENT,
       `session` varchar(64) DEFAULT NULL,
-      `timestamp` bigint(11) NOT NULL,
-      `url` bigint DEFAULT NULL,
+      `timestamp` bigint(11) DEFAULT NULL,
       `user_agent` text CHARACTER SET utf16 DEFAULT NULL,
       `user_ip` varchar(128) DEFAULT NULL,
-      `username` varchar(64) NOT NULL,
-      `value` bigint DEFAULT NULL,
-      primary key (pk)
+      `username` varchar(64) DEFAULT NULL,
+
+      `value_@` varchar(128) DEFAULT NULL,
+      `value_@candy` text DEFAULT NULL,
+      `value_currentTime` float DEFAULT NULL,
+      `value_error` varchar(8) DEFAULT NULL,
+      `value_eventTimestamp` bigint(20) DEFAULT NULL,
+      `value_fragment` tinytext DEFAULT NULL,
+      `value_initTimestamp` bigint(20) DEFAULT NULL,
+      `value_lectureID` int(11) DEFAULT NULL,
+      `value_networkState` int(11) DEFAULT NULL,
+      `value_paused` varchar(5) DEFAULT NULL,
+      `value_playbackRate` float DEFAULT NULL,
+      `value_prevTime` float DEFAULT NULL,
+      `value_readyState` int(11) DEFAULT NULL,
+      `value_type` varchar(32) DEFAULT NULL,
+
+      `url_parameters` text DEFAULT NULL,
+      `url_path` varchar(128) DEFAULT NULL,
+      `url_resource` varchar(128) DEFAULT NULL,
+
+      PRIMARY KEY (pk)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
     """
 
     conn.execute(query)
 
-    query = """CREATE TABLE `coursera_clickstream_value` (
-      `@` varchar(128) DEFAULT NULL,
-      `@candy` text DEFAULT NULL,
-      `currentTime` float DEFAULT NULL,
-      `error` varchar(8) DEFAULT NULL,
-      `eventTimestamp` bigint(20) DEFAULT NULL,
-      `fragment` tinytext DEFAULT NULL,
-      `id` bigint(20) NOT NULL AUTO_INCREMENT,
-      `initTimestamp` bigint(20) DEFAULT NULL,
-      `lectureID` int(11) DEFAULT NULL,
-      `networkState` int(11) DEFAULT NULL,
-      `paused` varchar(5) DEFAULT NULL,
-      `playbackRate` float DEFAULT NULL,
-      `prevTime` float DEFAULT NULL,
-      `readyState` int(11) DEFAULT NULL,
-      `type` varchar(32) DEFAULT NULL,
-      PRIMARY KEY (`id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-    """
-
-    conn.execute(query)
-
-    query = """CREATE TABLE `coursera_clickstream_url` (
-      `course_id` varchar(128) NOT NULL,
-      `id` bigint(20) NOT NULL AUTO_INCREMENT,
-        `parameters` text DEFAULT NULL,
-        `path` varchar(128) DEFAULT NULL,
-        `resource` varchar(128) DEFAULT NULL,
-      PRIMARY KEY (`id`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-    """
-
-    conn.execute(query)
-
+#Discover the table to insert data into
 metadata = MetaData()
 metadata.reflect(bind=conn)
 tbl_coursera_clickstream = metadata.tables["coursera_clickstream"]
-tbl_coursera_clickstream_value = metadata.tables["coursera_clickstream_value"]
-tbl_coursera_clickstream_url = metadata.tables["coursera_clickstream_url"]
+
+#Start database queue
+queue = Queue.Queue()
+dbq = ThreadedDBQueue(queue, conn, tbl_coursera_clickstream, batch_size=1000, log_to_console=args.verbose)
+dbq.start()
 
 for f in files:
     fid = os.path.splitext(basename(f))[0] #the courseid is this datafilename
@@ -189,13 +170,15 @@ for f in files:
                 js["id"] = fid
                 __json_parser(js)
             except Exception, e:
-                logger.warn("Exception {} from line {}".format(e, line))
-    logger.info("Committing last batch of inserts.")
-    db_batch_cleanup(conn, tbl_coursera_clickstream)
+                logger.warn("Exception {} from line '{}'".format(e, line))
+
+dbq.stop()
+logger.info("Waiting for database thread to complete data insertions.")
+dbq.join()
 
 #at the very end we now have IP addresses in the clickstream table we
 #need to run geolocation on
 #todo: this should be refactored into a method call, so much bad here
-command = 'python ./util/geolocate.py  --verbose --sql="SELECT DISTINCT user_ip from coursera_clickstream" --schemas="uselab_mooc"'
-logger.warn("Calling geolocation using command {}".format(command))
-os.system(command)
+#command = 'python ./util/geolocate.py  --verbose --sql="SELECT DISTINCT user_ip from coursera_clickstream" --schemas="uselab_mooc"'
+#logger.warn("Calling geolocation using command {}".format(command))
+#os.system(command)
