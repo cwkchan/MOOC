@@ -58,6 +58,17 @@ def get_coursera_schema_list():
     return schemas
 
 
+def convert_sessionid_to_id(session_id):
+    """Converts a session id in the form of 'introfinance-001' to a primary key such as 2.  Simple wrapper to select
+    from the uselab_mooc.coursera_index table"""
+    conn=get_connection()
+    rs = conn.execute("select id from coursera_index where session_id like '{}'".format(session_id))
+    id = int(rs.fetchone()[0])
+    rs.close()
+    conn.close()
+    return id
+
+
 def get_logger(name, verbose=False):
     """Returns a logger with the given name at either the debug or info level"""
     logger = logging.getLogger(name)
@@ -78,7 +89,7 @@ class ThreadedDBQueue(threading.Thread):
     Manages a queue for a given db connection, and table in separate thread.
     """
 
-    def __init__(self, queue, connection, table, batch_size=1000, log_to_console=False):
+    def __init__(self, queue, connection, table, batch_size=1000, log_to_console=False, hard_exit_on_failure=False):
         """
         queue should be of type Queue.Queue(), connection of type util.config.get_connection() (an SQLAlchemy engine),
         and table should be an SQLAlchemy table metadata object (e.g. metadata.tables["coursera_clickstream"]).
@@ -90,6 +101,7 @@ class ThreadedDBQueue(threading.Thread):
         self.close = False
         self.batch_size = batch_size
         self.log_to_console = log_to_console
+        self.hard_exit_on_failure = hard_exit_on_failure
 
     def stop(self):
         """
@@ -110,5 +122,12 @@ class ThreadedDBQueue(threading.Thread):
                 except Queue.Empty:
                     continue
             if self.log_to_console:
-                print("{} items being put in db for table {}, {} remain in queue.".format(len(items), self.table, self.queue.qsize()))
-            self.connection.execute(self.table.insert().values(items))
+                print("{} items being put in db for table {}, {} remain in queue.".format(len(items), self.table,
+                                                                                          self.queue.qsize()))
+            try:
+                self.connection.execute(self.table.insert().values(items))
+            except Exception, e:
+                if self.log_to_console:
+                    print("Exception {}".format(e))
+                if self.hard_exit_on_failure:
+                    os._exit(-1)
