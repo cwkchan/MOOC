@@ -20,7 +20,7 @@ from util.config import *
 from util.url_parser import *
 import sys
 from sqlalchemy import *
-import ujson #because life is too short
+import json #because life is too short
 from os.path import basename
 from os import listdir
 
@@ -61,7 +61,7 @@ def __value_parser(js):
     the string 'val' """
     if not ("value" not in js.keys() or js["value"] == "" or js["value"] == None or js["value"] == "{}"):
         try:
-            nested_js = ujson.loads(js["value"].encode('ascii', 'ignore'))
+            nested_js = json.loads(js["value"].encode('ascii', 'ignore'))
             #this is a workaround since some fields might also be nested
             for key in nested_js.keys():
                 if nested_js[key] != None:
@@ -170,7 +170,7 @@ for f in files:
         while line is not None and line != "":
             line = infile.readline()
             try:
-                js = ujson.loads(line.encode('ascii', 'ignore'))
+                js = json.loads(line.encode('ascii', 'ignore'))
                 js["id"] = fid
                 __json_parser(js)
                 __queue_control(queue)
