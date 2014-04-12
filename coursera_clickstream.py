@@ -47,8 +47,7 @@ def __url_parser(js):
     if not ( "page_url" not in js.keys() or js["page_url"] == "" or js["page_url"] is None):
         try:
             url_info = {}
-            course, url_info["url_path"], url_info["url_resource"], url_info["url_parameters"] = url_to_tuple(
-                js["page_url"])
+            course, url_info["url_path"], url_info["url_resource"], url_info["url_parameters"] = url_to_tuple(js["page_url"])
         except InvalidCourseraUrlException, e1:
             logger.warn("Url {} is not detected as a Coursera clickstream URL".format(e1.value))
         except Exception, e:

@@ -64,8 +64,6 @@ def convert_sessionid_to_id(session_id):
     conn=get_connection()
     rs = conn.execute("select id from coursera_index where session_id like '{}'".format(session_id))
     id = int(rs.fetchone()[0])
-    rs.close()
-    conn.close()
     return id
 
 
