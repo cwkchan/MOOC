@@ -19,6 +19,9 @@ import scipy.stats
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import sys, os
+
+sys.path.append(os.path.abspath(".."))
 from util.config import *
 
 def percent(list1, list2):
