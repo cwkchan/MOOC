@@ -19,6 +19,7 @@ import scipy.stats
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+from collections import OrderedDict
 import sys, os
 
 sys.path.append(os.path.abspath(".."))
@@ -80,11 +81,34 @@ def pairwise_ks(array):
                 print '  00'+str(i+1)+'-00'+str(j+1)+': D='+str(d)+', p='+str(p)
     print ''
 
+def calc_mean(column):
+    n = 0
+    total = 0
+    for row in column:
+        try:
+            number = int(row[0])
+            n += 1
+            total += number
+        except:
+            pass
+    return 1.0*total/n
+
+def calc_n(column):
+    n = 0
+    for row in column:
+        try:
+            number = int(row[0])
+            n += 1
+        except:
+            pass
+    return n
+
 parser = argparse.ArgumentParser(description='Generate engagement for each user across course blocks.')
 parser.add_argument('--courses', help='An optional list of courses to create tables from', required=False)
 args = parser.parse_args()
 
 conn = get_connection()
+qualtricsconn = get_connection('qualtrics_surveys')
 
 schemas = {}
 if (args.courses != None):
@@ -115,6 +139,14 @@ for course_id in courses:
     active = []
     graded = []
     statement_of_accomplishment = []
+
+    qualtrics_survey_sessions = []
+    qualtrics_survey_results = {'Q1':[],'Q2':[],'Q3':[],'Q4':[],'achieved_goals':[],'time_management':[],'certificate_motivation':[],'perform_better_academic':[],'perform_better_work':[],'pursue_topic':[],'problem_solving':[],'confidence_learning':[],'revisit_materials':[],'recommend_to_friend':[]}
+    qualtrics_survey_n = {'Q1':[],'Q2':[],'Q3':[],'Q4':[],'achieved_goals':[],'time_management':[],'certificate_motivation':[],'perform_better_academic':[],'perform_better_work':[],'pursue_topic':[],'problem_solving':[],'confidence_learning':[],'revisit_materials':[],'recommend_to_friend':[]}
+
+    demographic_survey_sessions = []
+    demographic_survey_results = {'Q1':[],'Q8':[]}
+    demographic_survey_n = {'Q1':[],'Q8':[]}
 
     for schema_name in schemas[course_id]:
         try:
@@ -180,6 +212,35 @@ for course_id in courses:
         except:
             pass
 
+        # Qualtrics surveys
+        try:
+            query = """SELECT *
+                       FROM   `%s`;""" % schema_name
+            qualtrics_surveys = pd.io.sql.read_frame(query, qualtricsconn.raw_connection())
+            qualtrics_survey_sessions.append(str(schema_name[-3:]))
+            for field in qualtrics_survey_results:
+                qualtrics_survey_results[field].append( calc_mean(qualtrics_surveys[[field]].values) )
+                qualtrics_survey_n[field].append( calc_n(qualtrics_surveys[[field]].values) )
+
+        except Exception, e:
+            pass
+
+        '''
+        # Demographics
+        try:
+            query = """SELECT *
+                       FROM   coursera_demographics
+                       WHERE  session_id='%s';""" % schema_name
+            demographic_survey = pd.io.sql.read_frame(query, conn.raw_connection())
+            demographic_survey_sessions.append(str(schema_name[-3:]))
+            #for field in demographic_survey_results:
+            #    qualtrics_survey_results[field].append(  )
+            #    qualtrics_survey_n[field].append(  )
+
+        except Exception, e:
+            print e
+        '''
+
     print '  Sessions: '+str(sessions)
     print '  '+str(registered)+' registered users'
     print '  '+str(percent(active,registered))+'% of registered users were active (i.e., accessed a lecture) '+str(active)
@@ -229,5 +290,38 @@ for course_id in courses:
     print '  Lecture download distributions:'
     pairwise_ks(lecture_downloads)
     timestamp_histograms(lecture_downloads, 'Lecture Downloads ('+course_id+')', 604800)
+
+    print '  Qualtrics Survey Responses:'
+    print '  Sessions: '+str(qualtrics_survey_sessions)
+    for field in qualtrics_survey_results:
+        print '  '+str(field)+': '+str(qualtrics_survey_results[field])+' n='+str(qualtrics_survey_n[field])
+    plt.figure()
+    plt.subplot(3, 1, 1)
+    plt.plot(np.arange(len(qualtrics_survey_results['Q1'])), qualtrics_survey_results['Q1'], marker='o', color=rgb(248,118,109), label='Q1')
+    plt.plot(np.arange(len(qualtrics_survey_results['Q2'])), qualtrics_survey_results['Q2'], marker='o', color=rgb(97,156,255), label='Q2')
+    plt.plot(np.arange(len(qualtrics_survey_results['Q3'])), qualtrics_survey_results['Q3'], marker='o', color=rgb(0,186,56), label='Q3')
+    plt.plot(np.arange(len(qualtrics_survey_results['Q4'])), qualtrics_survey_results['Q4'], marker='o', color=rgb(230,159,0), label='Q4')
+    plt.plot(np.arange(len(qualtrics_survey_results['achieved_goals'])), qualtrics_survey_results['achieved_goals'], marker='o', color='#666666', label='Achieved personal goals')
+    plt.xticks( np.arange(len(qualtrics_survey_results['Q1'])), qualtrics_survey_sessions[:len(qualtrics_survey_results['Q1'])] )
+    plt.ylabel('Average Score')
+    plt.legend()
+    plt.title('Qualtrics Survey Responses ('+course_id+')')
+
+    plt.subplot(3, 1, 2)
+    plt.plot(np.arange(len(qualtrics_survey_results['time_management'])), qualtrics_survey_results['time_management'], marker='o', color=rgb(248,118,109), label='Satisfied with how I managed my time')
+    plt.plot(np.arange(len(qualtrics_survey_results['certificate_motivation'])), qualtrics_survey_results['certificate_motivation'], marker='o', color=rgb(97,156,255), label='Certificate was a large motivation')
+    plt.plot(np.arange(len(qualtrics_survey_results['perform_better_academic'])), qualtrics_survey_results['perform_better_academic'], marker='o', color=rgb(0,186,56), label='Expect to perform better academically')
+    plt.plot(np.arange(len(qualtrics_survey_results['perform_better_work'])), qualtrics_survey_results['perform_better_work'], marker='o', color=rgb(230,159,0), label='Expect to perform better at work')
+    plt.xticks( np.arange(len(qualtrics_survey_results['Q1'])), qualtrics_survey_sessions[:len(qualtrics_survey_results['Q1'])] )
+    plt.ylabel('Average Score')
+    plt.legend()
+
+    plt.subplot(3, 1, 3)
+    plt.plot(np.arange(len(qualtrics_survey_results['pursue_topic'])), qualtrics_survey_results['pursue_topic'], marker='o', color=rgb(248,118,109), label='Inspired me to pursue topic further')
+    plt.plot(np.arange(len(qualtrics_survey_results['problem_solving'])), qualtrics_survey_results['perform_better_work'], marker='o', color=rgb(97,156,255), label='Improved my problem-solving skills')
+    plt.plot(np.arange(len(qualtrics_survey_results['confidence_learning'])), qualtrics_survey_results['recommend_to_friend'], marker='o', color=rgb(0,186,56), label='Made me more confident about learning new things')
+    plt.xticks( np.arange(len(qualtrics_survey_results['Q1'])), qualtrics_survey_sessions[:len(qualtrics_survey_results['Q1'])] )
+    plt.ylabel('Average Score')
+    plt.legend()
 
     plt.show()
