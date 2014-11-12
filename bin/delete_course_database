@@ -1,0 +1,88 @@
+#!/bin/bash
+
+source course_database.config
+
+usage () {
+  echo "usage: $0 -d DatabaseName - to delete a single database/schema	       
+	$0 -a - to delete all databases/schemas
+	$0 -h - for help
+	eg : $0 -d introfinance-004
+	"
+}
+
+all=""
+dbname=""
+while getopts ":d:ha" option; do
+  case "$option" in
+    d)  dbname="$OPTARG" 
+	echo $dbname ;;
+    a)  all="1" ;;
+    h)  usage
+	echo "In case of further information look up wiki"
+        exit 0 
+        ;;
+    :)  echo "ERROR: -$OPTARG requires an argument" 
+        usage
+        exit 1
+        ;;
+    ?)  echo "ERROR: Invalid option -$OPTARG" 
+        usage
+        exit 1
+        ;;
+  esac
+done    
+
+if [[ -z "$dbname" && -z "$all" ]]
+then
+	echo $dbname
+	echo $all
+  echo "ERROR: you must either specify a database name to delete using -d or use option -a to delete all databases"
+  usage
+  exit 1
+fi
+
+if [ -n "$dbname" ]
+then
+	echo "INFO: Constructing the names of the databases/schemas present in Mysql"
+
+        touch $temporary_file
+        chmod 777 $temporary_file
+        mysql -u "$user" -p"$password"  -e "show databases" >  $temporary_file 
+        
+	if [ $? -ne 0 ]
+        then
+                echo -e "Temporary file could not be created in the /tmp directory.\nCheck if temporary_file was correctly set in course_database.config."        
+                exit 1
+        fi
+	
+	wc=`grep "$dbname" ${temporary_file} | wc -l`
+	
+	if [ $wc -ne 1 ]
+	then 
+		echo "ERROR: The database $dbname is not a valid database. Please rerun the command with the options below"
+		cat ${temporary_file}
+		exit 1
+	fi
+
+	echo "INFO: Deleting database $dbname"  
+        mysql -u "$user" -p"$password"  -e "drop database if exists \`$dbname\` " 
+else
+	echo "INFO: Constructing the names of the databases/schemas imported from coursera"
+	touch $temporary_file
+	chmod 777 $temporary_file
+       	ls -1 "$home_dir" |awk -F "[()]" '{ for (i=2; i<NF; i+=2) print $i }'|sort |uniq > $temporary_file
+	if [ $? -ne 0 ]
+	then	
+        	echo "Temporary file could not be created in the /tmp directory.\n Check temporary_file was correctly set in course_database.config. \n"        
+		exit 1
+	fi
+
+	echo "Deleting all databases" 
+	while read database; do
+		echo "INFO: Deleting database $database"  
+  		mysql -u "$user" -p"$password"  -e "drop database if exists \`$database\` " 
+	done < $temporary_file 
+fi
+
+exit 0
+
