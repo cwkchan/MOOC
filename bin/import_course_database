@@ -75,7 +75,7 @@ while read database; do
   	mysql -u "$user" -p"$password"  -e "drop database if exists \`$database\` ; create database \`$database\` " 
 	echo "INFO: Uploading the following files..."
 	find "$home_dir" -name "*$database*.sql" | awk '{ print "source",$0 }'
-	#find "$home_dir" -name "*$database*.sql" | awk '{ print "source",$0 }' | mysql -u "$user" -p"$password" "$database"   
+	find "$home_dir" -name "*$database*.sql" | awk '{ print "source",$0 }' | mysql -u "$user" -p"$password" "$database"   
 
 done < $temporary_file 
 fi
