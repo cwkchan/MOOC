@@ -12,11 +12,11 @@
 #
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
-import Queue
+import queue
 import threading
 import time
 import mysql.connector
-import ConfigParser
+import configparser as configparser
 from sqlalchemy import *
 import logging
 import os
@@ -24,7 +24,7 @@ import os
 
 def get_properties():
     """Returns the list of properties as a dict of key/value pairs in the file config.properties."""
-    cf = ConfigParser.ConfigParser()
+    cf = configparser.ConfigParser()
     cf.read("config.properties")
     properties = {}
     for section in cf.sections():
@@ -112,19 +112,21 @@ class ThreadedDBQueue(threading.Thread):
         """
         Start the ThreadedDBQueue running, inserting up to batch_size items at once.
         """
+        if self.log_to_console:
+            print("Starting DB Queue.")
         while (not self.close) or self.queue.qsize() > 0:
             items = []
             for item_num in range(0, self.batch_size):
                 try:
                     items.append(self.queue.get_nowait())
-                except Queue.Empty:
+                except queue.Empty:
                     continue
             if self.log_to_console:
                 print("{} items being put in db for table {}, {} remain in queue.".format(len(items), self.table,
                                                                                           self.queue.qsize()))
             try:
                 self.connection.execute(self.table.insert().values(items))
-            except Exception, e:
+            except Exception as e:
                 if self.log_to_console:
                     print("Exception {}".format(e))
                 if self.hard_exit_on_failure:

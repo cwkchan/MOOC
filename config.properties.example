@@ -5,3 +5,13 @@ index=coursera_index
 
 [schemas]
 #schemas=course-001,course-002
+
+[coursera]
+username=
+password=
+
+[ancillary]
+clickstream=
+demographic=
+intent=
+sql=
