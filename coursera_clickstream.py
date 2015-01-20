@@ -1,7 +1,7 @@
-#    Copyright (C) 2013 The Regents of the University of Michigan
+# Copyright (C) 2013 The Regents of the University of Michigan
 #
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
 #    the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
@@ -13,21 +13,21 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
-import Queue
+import multiprocessing
 import argparse
-from threading import Condition
+from threading import Condition, RLock
 from util.config import *
 from util.url_parser import *
 import sys
 from sqlalchemy import *
-import ujson #because life is too short
+import ujson  # because life is too short
 from os.path import basename
 from os import listdir
+import gzip
 
 
-def __json_parser(js):
+def __json_parser(js, queue):
     """This inserts the data into the coursera_clickstream table in batch form."""
-    global queue
     js = __value_parser(js)
     js = __url_parser(js)
     js = __flatten_lists(js)
@@ -47,10 +47,13 @@ def __url_parser(js):
     if not ( "page_url" not in js.keys() or js["page_url"] == "" or js["page_url"] is None):
         try:
             url_info = {}
-            course, url_info["url_path"], url_info["url_resource"], url_info["url_parameters"] = url_to_tuple(js["page_url"])
-        except InvalidCourseraUrlException, e1:
+            course, url_info["url_path"], url_info["url_resource"], url_info["url_parameters"] = url_to_tuple(
+                js["page_url"])
+            for key in url_info.keys():
+                js[key] = url_info[key]
+        except InvalidCourseraUrlException as e1:
             logger.warn("Url {} is not detected as a Coursera clickstream URL".format(e1.value))
-        except Exception, e:
+        except Exception as e:
             logger.warn("Exception {} from line {}".format(e, js["page_url"]))
     return js
 
@@ -60,25 +63,27 @@ def __value_parser(js):
     the string 'val' """
     if not ("value" not in js.keys() or js["value"] == "" or js["value"] == None or js["value"] == "{}"):
         try:
-            nested_js = ujson.loads(js["value"].encode('ascii', 'ignore'))
+            nested_js = ujson.loads(js["value"])
             #this is a workaround since some fields might also be nested
             for key in nested_js.keys():
                 if nested_js[key] != None:
                     nested_js[key] = str(nested_js[key])
                 js["value_{}".format(key)] = nested_js[key]
-        except Exception, e:
+        except Exception as e:
             logger.warn("Exception {} from line {}".format(e, js["value"]))
     if "value" in js:
         del js["value"]
     return js
 
+
 def __queue_control(queue, maxsize=100000):
     """Checks to see if the queue is full and pauses for catchup if neccessary """
     while queue.qsize() >= maxsize:
-        cv = Condition(threading.RLock())
+        cv = Condition(RLock())
         cv.acquire()
         cv.wait(1)
         cv.release()
+
 
 parser = argparse.ArgumentParser(description='Import coursera clickstream data files into the database')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
@@ -101,6 +106,7 @@ else:
         raise Exception("One of files or directory is require.")
 
 conn = get_connection()
+BATCH_SIZE = 1000
 
 if args.clean:
     query = "DROP TABLE IF EXISTS coursera_clickstream"
@@ -110,40 +116,40 @@ if args.clean:
         pass
 
     query = """CREATE TABLE `coursera_clickstream` (
-      `12` varchar(64) DEFAULT NULL,
-      `13` varchar(8) DEFAULT NULL,
-      `14` text DEFAULT NULL,
-      `client` varchar(32) DEFAULT NULL,
-      `from` text DEFAULT NULL,
-      `id` int DEFAULT NULL,
-      `key` text DEFAULT NULL,
-      `language` text DEFAULT NULL,
-      `page_url` text DEFAULT NULL,
-      `pk` bigint NOT NULL AUTO_INCREMENT,
-      `session` varchar(64) DEFAULT NULL,
-      `timestamp` bigint(11) DEFAULT NULL,
-      `user_agent` text CHARACTER SET utf16 DEFAULT NULL,
-      `user_ip` varchar(128) DEFAULT NULL,
-      `username` varchar(64) DEFAULT NULL,
+      `12` VARCHAR(64) DEFAULT NULL,
+      `13` VARCHAR(8) DEFAULT NULL,
+      `14` TEXT DEFAULT NULL,
+      `client` VARCHAR(32) DEFAULT NULL,
+      `from` TEXT DEFAULT NULL,
+      `id` INT DEFAULT NULL,
+      `key` TEXT DEFAULT NULL,
+      `language` TEXT DEFAULT NULL,
+      `page_url` TEXT DEFAULT NULL,
+      `pk` BIGINT NOT NULL AUTO_INCREMENT,
+      `session` VARCHAR(64) DEFAULT NULL,
+      `timestamp` BIGINT(11) DEFAULT NULL,
+      `user_agent` TEXT CHARACTER SET utf16 DEFAULT NULL,
+      `user_ip` VARCHAR(128) DEFAULT NULL,
+      `username` VARCHAR(64) DEFAULT NULL,
 
-      `value_@` varchar(128) DEFAULT NULL,
-      `value_@candy` text DEFAULT NULL,
-      `value_currentTime` float DEFAULT NULL,
-      `value_error` varchar(8) DEFAULT NULL,
-      `value_eventTimestamp` bigint(20) DEFAULT NULL,
-      `value_fragment` tinytext DEFAULT NULL,
-      `value_initTimestamp` bigint(20) DEFAULT NULL,
-      `value_lectureID` int(11) DEFAULT NULL,
-      `value_networkState` int(11) DEFAULT NULL,
-      `value_paused` varchar(5) DEFAULT NULL,
-      `value_playbackRate` float DEFAULT NULL,
-      `value_prevTime` float DEFAULT NULL,
-      `value_readyState` int(11) DEFAULT NULL,
-      `value_type` varchar(32) DEFAULT NULL,
+      `value_@` VARCHAR(128) DEFAULT NULL,
+      `value_@candy` TEXT DEFAULT NULL,
+      `value_currentTime` FLOAT DEFAULT NULL,
+      `value_error` VARCHAR(8) DEFAULT NULL,
+      `value_eventTimestamp` BIGINT(20) DEFAULT NULL,
+      `value_fragment` TINYTEXT DEFAULT NULL,
+      `value_initTimestamp` BIGINT(20) DEFAULT NULL,
+      `value_lectureID` INT(11) DEFAULT NULL,
+      `value_networkState` INT(11) DEFAULT NULL,
+      `value_paused` VARCHAR(5) DEFAULT NULL,
+      `value_playbackRate` FLOAT DEFAULT NULL,
+      `value_prevTime` FLOAT DEFAULT NULL,
+      `value_readyState` INT(11) DEFAULT NULL,
+      `value_type` VARCHAR(32) DEFAULT NULL,
 
-      `url_parameters` text DEFAULT NULL,
-      `url_path` varchar(128) DEFAULT NULL,
-      `url_resource` varchar(128) DEFAULT NULL,
+      `url_parameters` TEXT DEFAULT NULL,
+      `url_path` VARCHAR(128) DEFAULT NULL,
+      `url_resource` VARCHAR(128) DEFAULT NULL,
 
       PRIMARY KEY (pk)
     ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
@@ -157,11 +163,25 @@ metadata.reflect(bind=conn)
 tbl_coursera_clickstream = metadata.tables["coursera_clickstream"]
 
 for f in files:
-    fid = convert_sessionid_to_id(os.path.splitext(basename(f))[0]) #the courseid is this datafilename, convert to pk
-    with open(f) as infile:
-        #Start database queue
-        queue = Queue.Queue()
-        dbq = ThreadedDBQueue(queue, conn, tbl_coursera_clickstream, batch_size=10000, log_to_console=args.verbose, hard_exit_on_failure=True)
+    open_fun = open
+    if f.endswith(".gz"):
+        open_fun = gzip.open
+
+    # the courseid is the filename, but may have a _clickstream_export appended by coursera
+    filename = os.path.splitext(basename(f))[0].replace("_clickstream_export", '')
+    try:
+        fid = convert_sessionid_to_id(filename)  # convert to pk
+    except TypeError as e:
+        logger.error(
+            "Could not convert filename {} session identifier in the database, the best guess was {}.  Perhaps "
+            "this course has not been put in the database yet?".format(f, filename))
+        sys.exit(-1)
+
+    with open_fun(f) as infile:
+        # Start database queue
+        queue = multiprocessing.Queue()
+        dbq = ThreadedDBQueue(queue, conn, tbl_coursera_clickstream, batch_size=BATCH_SIZE, log_to_console=args.verbose,
+                              hard_exit_on_failure=False)
         dbq.start()
 
         logger.info("Working with file {}.".format(f))
@@ -169,13 +189,14 @@ for f in files:
         while line is not None and line != "":
             line = infile.readline()
             try:
-                js = ujson.loads(line.encode('ascii', 'ignore'))
+                js = ujson.loads(line)
                 js["id"] = fid
-                __json_parser(js)
+                __json_parser(js, queue)
                 __queue_control(queue)
-            except Exception, e:
+            except Exception as e:
                 logger.warn("Exception {} from line '{}'".format(e, line))
-        #Wait for the db injector to finish processing this file
+                logger.info("line type is {}".format(type(line)))
+        # Wait for the db injector to finish processing this file
         dbq.stop()
         logger.info("Waiting for database thread to complete data insertions.")
         dbq.join()
