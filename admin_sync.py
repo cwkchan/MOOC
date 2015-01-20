@@ -18,7 +18,7 @@ from core.coursera import Course, Base
 
 import sys
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import sleep
 
 from sqlalchemy.orm import sessionmaker
@@ -50,6 +50,10 @@ parser.add_argument('--username', action='store',
 parser.add_argument('--password', action='store',
                     help="The password to connect to log into the Coursera site with, checks config.properties for "
                          "username if this value does not exist")
+parser.add_argument('--update', action='store_true', help='Whether to update the local database of coursera courses.'
+                                                          'This will launch a firefox instance and scrape the web.')
+parser.add_argument('--verify', action='store_true', help='Whether to verify if files have been downloaded from '
+                                                          'Coursera')
 args = parser.parse_args()
 
 logger = get_logger("admin_sync.py", args.verbose)
@@ -77,36 +81,6 @@ if args.clean:
         conn.execute(query)
     except Exception as e:
         pass
-
-browser = webdriver.Firefox()
-browser.implicitly_wait(SECONDS_TO_WAIT)
-browser.get(login_url)
-WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.ID, "signin-email")))
-browser.find_element_by_id('signin-email').send_keys(username)
-browser.find_element_by_id('signin-password').send_keys(password)
-browser.find_element_by_class_name("coursera-signin-button").submit()
-
-WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.CLASS_NAME, "internal-site-admin")))
-browser.get(admin_url)
-WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.CLASS_NAME, "model-admin-table")))
-sleep(5)
-
-courses = []
-for element in browser.find_elements_by_class_name("internal-site-admin"):
-    #ignore links that are not sessions
-    if "sessions/" not in element.get_attribute('href'):
-        logger.info("URL Not being followed: {}".format(element.get_attribute('href')))
-        continue
-    logger.debug("This URL will be inspected: {}".format(element.get_attribute('href')))
-
-    course_details = {
-        'admin_id': int(element.get_attribute('href').split('/')[-1]),
-        'session_id': element.get_attribute('text')[:-1]}
-    print("Adding data on {} to list.".format(course_details['session_id']))
-    courses.append(course_details)
-
-#todo: wait for some ajax to finish, probably better to be an explicit wait on some element with a timeout
-sleep(5)
 
 
 def load_course_details(course, delay=3):
@@ -142,22 +116,97 @@ def load_course_details(course, delay=3):
         #it is possible for a course not to have an end date, again, old courses.
         pass
 
+def update_database():
+    browser = webdriver.Firefox()
+    browser.implicitly_wait(SECONDS_TO_WAIT)
+    browser.get(login_url)
+    WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.ID, "signin-email")))
+    browser.find_element_by_id('signin-email').send_keys(username)
+    browser.find_element_by_id('signin-password').send_keys(password)
+    browser.find_element_by_class_name("coursera-signin-button").submit()
 
-for c in courses:
-    #It's possible that the browser locked up or something on trying to course details, in which cse we will
-    #try one more time after cooling down
-    for i in range(MAX_RETRIES):
-        try:
-            load_course_details(c)
-            break
-        except:
-            sleep(MAX_RETRIES_WAIT)
-    logger.warn("Course {} would not load.  Tried {} times.".format(c['admin_id'], MAX_RETRIES))
+    WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.CLASS_NAME, "internal-site-admin")))
+    browser.get(admin_url)
+    WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.CLASS_NAME, "model-admin-table")))
+    sleep(5)
 
-Base.metadata.create_all(conn)
-Session = sessionmaker(bind=conn)
-session = Session()
+    courses = []
+    for element in browser.find_elements_by_class_name("internal-site-admin"):
+        #ignore links that are not sessions
+        if "sessions/" not in element.get_attribute('href'):
+            logger.info("URL Not being followed: {}".format(element.get_attribute('href')))
+            continue
+        logger.debug("This URL will be inspected: {}".format(element.get_attribute('href')))
 
-for course in courses:
-    session.add(Course(**course))
-session.commit()
+        course_details = {
+            'admin_id': int(element.get_attribute('href').split('/')[-1]),
+            'session_id': element.get_attribute('text')[:-1]}
+        print("Adding data on {} to list.".format(course_details['session_id']))
+        courses.append(course_details)
+
+    #todo: wait for some ajax to finish, probably better to be an explicit wait on some element with a timeout
+    sleep(5)
+
+    for c in courses:
+        #It's possible that the browser locked up or something on trying to course details, in which cse we will
+        #try one more time after cooling down
+        for i in range(MAX_RETRIES):
+            try:
+                load_course_details(c)
+                break
+            except:
+                sleep(MAX_RETRIES_WAIT)
+        logger.warn("Course {} would not load.  Tried {} times.".format(c['admin_id'], MAX_RETRIES))
+
+    Base.metadata.create_all(conn)
+    Session = sessionmaker(bind=conn)
+    session = Session()
+
+    for course in courses:
+        session.add(Course(**course))
+    session.commit()
+
+def verify_courses():
+    Base.metadata.create_all(conn)
+    Session = sessionmaker(bind=conn)
+    session = Session()
+
+    missing_clickstream=[]
+    missing_sql=[]
+    missing_intent=[]
+    missing_demographics=[]
+    for course in session.query(Course):
+        # todo: Eventually this should use the end time of the course, but that is unreliable on old courses.
+        if course.start is not None:
+            if datetime.today() - course.start > timedelta(days=106):
+                if not course.has_clickstream():
+                    missing_clickstream.append(course)
+                if not course.has_sql():
+                    missing_sql.append(course)
+                if not course.has_intent():
+                    missing_intent.append(course)
+                if not course.has_demographics():
+                    missing_demographics.append(course)
+
+    print("The following courses are missing clickstream files: ")
+    for course in missing_clickstream:
+        print(course.session_id, end=', ')
+    print("\nThe following courses are missing sql files: ")
+    for course in missing_sql:
+        print(course.session_id, end=', ')
+    print("\nThe following courses are missing intent files: ")
+    for course in missing_intent:
+        print(course.session_id, end=', ')
+    print("\nThe following courses are missing demographics files: ")
+    for course in missing_demographics:
+        print(course.session_id, end=', ')
+    print("\n\nTo request up to date files please see https://docs.google.com/a/umich.edu/forms/d/1VI9G_0uU2tr7-0hFNINOl8Gi79Tw0Dme4BsilLCixgM/viewform")
+
+# todo there must be a slicker argsparser way to do this
+if not args.update and not args.verify:
+    print("You must use either --update or --verify.")
+else:
+    if args.update:
+        update_database()
+    if args.verify:
+        verify_courses()

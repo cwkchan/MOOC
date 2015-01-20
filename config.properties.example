@@ -12,6 +12,6 @@ password=
 
 [ancillary]
 clickstream=
-demographic=
+demographics=
 intent=
 sql=
