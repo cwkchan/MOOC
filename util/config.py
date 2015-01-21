@@ -20,6 +20,7 @@ import configparser as configparser
 from sqlalchemy import *
 import logging
 import os
+from ctypes import c_bool
 
 
 def get_properties():
@@ -92,11 +93,11 @@ class ThreadedDBQueue(multiprocessing.Process):
         queue should be of type Queue.Queue(), connection of type util.config.get_connection() (an SQLAlchemy engine),
         and table should be an SQLAlchemy table metadata object (e.g. metadata.tables["coursera_clickstream"]).
         """
-        multiprocessing.Process.__init__(self, daemon=True)
+        multiprocessing.Process.__init__(self) # , daemon=True)
         self.queue = queue
         self.connection = connection
         self.table = table
-        self.close = False
+        self.close = multiprocessing.Value(c_bool, False)
         self.batch_size = batch_size
         self.log_to_console = log_to_console
         self.hard_exit_on_failure = hard_exit_on_failure
@@ -106,7 +107,7 @@ class ThreadedDBQueue(multiprocessing.Process):
         """
         Indicates that the ThreadedDBQueue should shutdown after it has emptied its queue.
         """
-        self.close = True
+        self.close.value = True
 
     def __insert_values(self, items):
         """
@@ -133,7 +134,7 @@ class ThreadedDBQueue(multiprocessing.Process):
         """
         if self.log_to_console:
             print("Starting DB Queue.")
-        while (not self.close) or self.queue.qsize() > 0:
+        while self.queue.qsize() > 0 or self.close.value is False:
             items = []
             for item_num in range(0, self.batch_size):
                 try:
