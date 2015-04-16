@@ -82,8 +82,29 @@ if args.clean:
     except Exception as e:
         pass
 
+    query='''CREATE TABLE `coursera_index` (
+  `session_id` varchar(255) DEFAULT NULL,
+  `admin_id` int(11) NOT NULL AUTO_INCREMENT,
+  `course` varchar(255) CHARACTER SET utf16 DEFAULT NULL,
+  `instructor` varchar(255) DEFAULT NULL,
+  `start` datetime DEFAULT NULL,
+  `end` datetime DEFAULT NULL,
+  `duration` int(11) DEFAULT NULL,
+  `enrollment` varchar(255) DEFAULT NULL,
+  `url` varchar(1024) DEFAULT NULL,
+  `allow_signature` tinyint(1) DEFAULT NULL,
+  PRIMARY KEY (`admin_id`),
+  UNIQUE KEY `admin_id` (`admin_id`),
+  UNIQUE KEY `ix_coursera_index_session_id` (`session_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=974755 DEFAULT CHARSET=latin1;'''
 
-def load_course_details(course, delay=3):
+    try:
+        conn.execute(query)
+    except Exception as e:
+        logger.fatal("Failed to create new table for index on --clean")
+
+
+def load_course_details(course, browser, delay=3):
     print(session_url.format(course['admin_id']))
     browser.get(session_url.format(course['admin_id']))
     # individual course pages
@@ -93,27 +114,33 @@ def load_course_details(course, delay=3):
     #todo: wait for some ajax to finish, probably better to be an explicit wait
     sleep(delay)
 
-    bdy = browser.find_element_by_class_name("model-admin-fields")
-    course['session_id'] = bdy.find_element_by_xpath('//h1').text.split("/")[0]
-    course['course'] = bdy.find_element_by_xpath('div[1]//h3').text
-    course['url'] = bdy.find_element_by_xpath('div[2]//a').get_attribute('href')
-    year = bdy.find_element_by_name('start_year').find_element_by_xpath(
-        ".//option[@selected='selected']").get_attribute('value')
-    month = bdy.find_element_by_name('start_month').find_element_by_xpath(
-        ".//option[@selected='selected']").get_attribute('value')
     try:
-        day = bdy.find_element_by_name('start_day').find_element_by_xpath(
-            ".//option[@selected='selected']").get_attribute(
-            'value')
+        bdy = browser.find_element_by_class_name("model-admin-fields")
+        course['session_id'] = bdy.find_element_by_xpath('//h1').text.split("/")[0]
+        course['course'] = bdy.find_element_by_xpath('div[1]//h3').text
+        course['url'] = bdy.find_element_by_xpath('div[2]//a').get_attribute('href')
+        year = bdy.find_element_by_name('start_year').find_element_by_xpath(
+            ".//option[@selected='selected']").get_attribute('value')
+        month = bdy.find_element_by_name('start_month').find_element_by_xpath(
+            ".//option[@selected='selected']").get_attribute('value')
+        try:
+            day = bdy.find_element_by_name('start_day').find_element_by_xpath(
+                ".//option[@selected='selected']").get_attribute(
+                'value')
+        except:
+            #its possible there is no day available, really old classes might be like this.
+            day = '1'
+        course['start'] = datetime(int(year), int(month), int(day))
+        end_date = bdy.find_element_by_name('end_date').get_attribute("value")
+        try:
+            course['end'] = datetime(int(end_date.split('-')[0]), int(end_date.split('-')[1]), int(end_date.split('-')[2]))
+        except:
+            #it is possible for a course not to have an end date, again, old courses.
+            pass
     except:
-        #its possible there is no day available, really old classes might be like this.
-        day = '1'
-    course['start'] = datetime(int(year), int(month), int(day))
-    end_date = bdy.find_element_by_name('end_date').get_attribute("value")
-    try:
-        course['end'] = datetime(int(end_date.split('-')[0]), int(end_date.split('-')[1]), int(end_date.split('-')[2]))
-    except:
-        #it is possible for a course not to have an end date, again, old courses.
+        #it is possible that one or more of these elements do not exist
+        #consider this malformed and just return None
+        #todo: not sure what the implications are on trying to put it into the db.
         pass
 
 def update_database():
@@ -125,7 +152,7 @@ def update_database():
     browser.find_element_by_id('signin-password').send_keys(password)
     browser.find_element_by_class_name("coursera-signin-button").submit()
 
-    WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.CLASS_NAME, "internal-site-admin")))
+    sleep(3)
     browser.get(admin_url)
     WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.CLASS_NAME, "model-admin-table")))
     sleep(5)
@@ -152,11 +179,12 @@ def update_database():
         #try one more time after cooling down
         for i in range(MAX_RETRIES):
             try:
-                load_course_details(c)
+                load_course_details(c, browser)
                 break
-            except:
+            except Exception as e:
                 sleep(MAX_RETRIES_WAIT)
-        logger.warn("Course {} would not load.  Tried {} times.".format(c['admin_id'], MAX_RETRIES))
+        if i >= MAX_RETRIES:
+            logger.warn("Course {} would not load.  Tried {} times.".format(c['admin_id'], MAX_RETRIES))
 
     Base.metadata.create_all(conn)
     Session = sessionmaker(bind=conn)
