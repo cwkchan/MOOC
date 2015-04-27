@@ -33,10 +33,12 @@ SECONDS_TO_WAIT = 15
 MAX_RETRIES = 5
 '''the amount of time to sleep between individual course reloads'''
 MAX_RETRIES_WAIT = 10
-
-login_url = 'https://accounts.coursera.org/signin?mode=signin&post_redirect=%2F'
-admin_url = 'https://www.coursera.org/admin/'
-session_url = 'https://www.coursera.org/admin/data/sessions/{}'
+'''This is the login URL for Coursera which will give back cookies'''
+LOGIN_URL = 'https://accounts.coursera.org/signin?mode=signin&post_redirect=%2F'
+'''This is the admin page which lists all of the courses'''
+ADMIN_URL = 'https://www.coursera.org/admin/'
+'''This is the URL to a single course download page'''
+SESSION_URL = 'https://www.coursera.org/admin/data/sessions/{}'
 
 parser = argparse.ArgumentParser(description='Syncs local database with Coursera Admin website.  This script will '
                                              'update data with respect to existing courses, but will not delete courses'
@@ -76,7 +78,7 @@ except Exception as e:
     sys.exit(1)
 
 if args.clean:
-    query = "DROP TABLE IF EXISTS {}".format(Course.__tablename__)
+    query = '''DROP TABLE IF EXISTS {}'''.format(Course.__tablename__)
     try:
         conn.execute(query)
     except Exception as e:
@@ -105,8 +107,8 @@ if args.clean:
 
 
 def load_course_details(course, browser, delay=3):
-    print(session_url.format(course['admin_id']))
-    browser.get(session_url.format(course['admin_id']))
+    print(SESSION_URL.format(course['admin_id']))
+    browser.get(SESSION_URL.format(course['admin_id']))
     # individual course pages
     #give the page a chance to load
     WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located(
@@ -146,14 +148,14 @@ def load_course_details(course, browser, delay=3):
 def update_database():
     browser = webdriver.Firefox()
     browser.implicitly_wait(SECONDS_TO_WAIT)
-    browser.get(login_url)
+    browser.get(LOGIN_URL)
     WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.ID, "signin-email")))
     browser.find_element_by_id('signin-email').send_keys(username)
     browser.find_element_by_id('signin-password').send_keys(password)
     browser.find_element_by_class_name("coursera-signin-button").submit()
 
     sleep(3)
-    browser.get(admin_url)
+    browser.get(ADMIN_URL)
     WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.CLASS_NAME, "model-admin-table")))
     sleep(5)
 

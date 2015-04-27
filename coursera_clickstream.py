@@ -24,6 +24,7 @@ import ujson  # because life is too short
 from os.path import basename
 from os import listdir
 import gzip
+import time
 
 
 def __json_parser(js, queue):
@@ -81,13 +82,19 @@ def __queue_control(queue, maxsize=100000):
     while queue.qsize() >= maxsize:
         cv = Condition(RLock())
         cv.acquire()
-        cv.wait(1)
+        cv.wait(10)
         cv.release()
 
 
 parser = argparse.ArgumentParser(description='Import coursera clickstream data files into the database')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
+parser.add_argument('--output',  help='The output file.  If this is not specified data will be stored directly in the'
+                                      'database (slow).  If this is specified data will be stored in a CSV file at the'
+                                      'given location.  Data can be loaded from the CSV file with: LOAD DATA LOCAL '
+                                      'INFILE "/tmp/filename.csv" INTO TABLE uselab_mooc.coursera_clickstream IGNORE 1 '
+                                      'LINES; (fast).  Note: the output file must be easily accessible by MySQL (e.g.'
+                                      'stored in /tmp)')
 group = parser.add_mutually_exclusive_group(required=True)
 group.add_argument('--files', help='A comma separated list of the files to import')
 group.add_argument('--dir', help='A directory with Coursera clickstream logs')
@@ -119,13 +126,13 @@ if args.clean:
       `12` VARCHAR(64) DEFAULT NULL,
       `13` VARCHAR(8) DEFAULT NULL,
       `14` TEXT DEFAULT NULL,
+      `30` TEXT DEFAULT NULL,
       `client` VARCHAR(32) DEFAULT NULL,
       `from` TEXT DEFAULT NULL,
       `id` INT DEFAULT NULL,
       `key` TEXT DEFAULT NULL,
       `language` TEXT DEFAULT NULL,
       `page_url` TEXT DEFAULT NULL,
-      `pk` BIGINT NOT NULL AUTO_INCREMENT,
       `session` VARCHAR(64) DEFAULT NULL,
       `timestamp` BIGINT(11) DEFAULT NULL,
       `user_agent` TEXT CHARACTER SET utf16 DEFAULT NULL,
@@ -151,8 +158,16 @@ if args.clean:
       `url_path` VARCHAR(128) DEFAULT NULL,
       `url_resource` VARCHAR(128) DEFAULT NULL,
 
-      PRIMARY KEY (pk)
-    ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+      KEY `username_index` (`username`),
+      KEY `id_index` (`id`) USING BTREE,
+      KEY `user_ip_index` (`user_ip`),
+      KEY `path_index` (`url_path`),
+      KEY `path_res_index` (`url_resource`,`url_path`),
+      KEY `pk` (`id`,`user_ip`,`timestamp`) USING BTREE,
+      KEY `time_index` (`timestamp`) USING BTREE
+    ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+    /*!50100 PARTITION BY KEY (id)
+    PARTITIONS 100 */;
     """
 
     conn.execute(query)
@@ -178,15 +193,21 @@ for f in files:
         sys.exit(-1)
 
     with open_fun(f) as infile:
-        # Start database queue
+        # Start queue
         queue = multiprocessing.Queue()
-        dbq = ThreadedDBQueue(queue, conn, tbl_coursera_clickstream, batch_size=BATCH_SIZE, log_to_console=args.verbose,
-                              hard_exit_on_failure=False)
+        if args.output:
+            logger.info("Storing output in csv format to file {}".format(args.output))
+            dbq = ThreadedCSVQueue(queue, open(args.output,'a'), tbl_coursera_clickstream, batch_size=BATCH_SIZE,
+                                   log_to_console=args.verbose, hard_exit_on_failure=False)
+        else:
+            logger.info("Storing output directly to database.")
+            dbq = ThreadedDBQueue(queue, conn, tbl_coursera_clickstream, batch_size=BATCH_SIZE, log_to_console=args.verbose,
+                                  hard_exit_on_failure=False)
         dbq.start()
 
         logger.info("Working with file {}.".format(f))
         line = " "
-        while line is not None and line != "":
+        while line is not None and line != b'':
             line = infile.readline()
             try:
                 js = ujson.loads(line)
@@ -199,11 +220,12 @@ for f in files:
         # Wait for the db injector to finish processing this file
         dbq.stop()
         logger.info("Waiting for database thread to complete data insertions.")
-        dbq.join()
+        while dbq.is_alive():
+            time.sleep(1)
 
 #at the very end we now have IP addresses in the clickstream table we
 #need to run geolocation on
 #todo: this should be refactored into a method call, so much bad here
-#command = 'python ./util/geolocate.py  --verbose --sql="SELECT DISTINCT user_ip from coursera_clickstream" --schemas="uselab_mooc"'
+#command = 'python ./util/geolocate.py  --verbose --sql="SELECT DISTINCT user_ip from coursera_clickstream where ip not in (select distinct(ip) from coursera_geolocate)" --schemas="uselab_mooc"'
 #logger.warn("Calling geolocation using command {}".format(command))
 #os.system(command)
