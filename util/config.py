@@ -15,7 +15,6 @@
 
 import multiprocessing
 import queue
-import mysql.connector
 import configparser as configparser
 from sqlalchemy import *
 import logging

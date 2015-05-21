@@ -1,9 +1,25 @@
-from . import Base
+# Copyright (C) 2013  The Regents of the University of Michigan
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see [http://www.gnu.org/licenses/].
+#
+
 from util.config import *
+
+from . import Base
 import os.path as path
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
-
 
 class Course(Base):
     __tablename__ = "coursera_index"
@@ -54,6 +70,13 @@ class Course(Base):
         :return: True if an intent file exists in the position get_properties()['intent'], False if it doesn't
         """
         return path.isfile("{}/{}.csv".format(get_properties()['intent'], str(self.session_id)))
+
+    def has_pii(self):
+        """Determines whether the pii files for this course have already been downloaded.
+
+        :return: True if an pii file exists in the position get_properties()['intent'], False if it doesn't
+        """
+        return path.isfile("{}/{}.csv".format(get_properties()['pii'], str(self.session_id)))
 
     def has_demographics(self):
         """Determines whether the demographics files for this course have already been downloaded.
