@@ -13,10 +13,12 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
+from util.config import *
+
 import argparse
 import maxminddb
-from config import *
 import sys
+
 from sqlalchemy import *
 from sqlalchemy.exc import *
 
@@ -103,7 +105,7 @@ for schema in schemas:
 				map(ip_set.add,ip.split(","))
 			else:
 				ip_set.add(ip)
-	except Exception, e:
+	except Exception as e:
 		logger.warn("Error accessing schem {} with exception {}".format(schema, e))
 		continue
 
@@ -122,13 +124,13 @@ for ip in ip_set:
 		output_dict["postal"]=__get_nested_item(["postal","code"], entry_dict)
 		output_dict["time_zone"]=__get_nested_item(["location","time_zone"], entry_dict)
 		conn.execute( tbl_coursera_geolocate.insert().values(output_dict) )
-	except IntegrityError, ie:
+	except IntegrityError as ie:
 		#supress duplicate key errors in MySQL
 		if str(ie.orig).startswith("1062: Duplicate"):
 			continue
 		else:
 			logger.warn("Error entering data for ip {} {}".format(ip,ie))
-	except Exception, e:
+	except Exception as e:
 		logger.warn("Error entering data for ip {} {}".format(ip,e))
 
 reader.close()

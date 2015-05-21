@@ -13,11 +13,12 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
-import argparse
-import pandas as pd
-from os import listdir
 from util.config import *
 from names.clean_names import *
+
+import argparse
+from os import listdir
+import pandas as pd
 
 parser = argparse.ArgumentParser(description='Copy pii data from csv to SQL database.')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
@@ -61,7 +62,7 @@ for csv_file in csvs:
     logger.debug("Reading file {} into dataframe.".format(csv_file))
     try:
         df = pd.io.parsers.read_csv(csv_file, delimiter=',')
-    except Exception, e:
+    except Exception as e:
         logger.warn("Exception found, skipping this file: {}".format(e))
         continue
     df.columns = ['user_id', 'name', 'email']
@@ -74,7 +75,7 @@ for csv_file in csvs:
 
     #should we be doing this if they didn't say --clean?
     try:
-        sql_delete_session_id = 'DELETE FROM coursera_pii WHERE session_id='{}';'.format(session_id)
+        sql_delete_session_id = 'DELETE FROM coursera_pii WHERE session_id={};'.format(session_id)
         conn.execute(sql_delete_session_id)
         #boo, workaround for bug https://github.com/pydata/pandas/issues/2754
         #convert the dataframe to a single type to replaces nulls with Nones
@@ -83,5 +84,5 @@ for csv_file in csvs:
         df[pd.isnull(df)] = None
         logger.debug("Writing data from file {} into database.".format(csv_file))
         pd.io.sql.write_frame(df, 'coursera_pii', conn.raw_connection(), flavor='mysql', if_exists='append')
-    except Exception, e:
+    except Exception as e:
         logger.warn("Exception {}".format(e))

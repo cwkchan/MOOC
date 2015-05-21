@@ -13,8 +13,9 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
-import argparse
 from util.config import *
+
+import argparse
 
 parser = argparse.ArgumentParser(description='Create views across schemas')
 parser.add_argument('--clean', action='store_true', help='Whether to drop views first')
@@ -69,5 +70,5 @@ logging.info("Preparing query: {}".format(query))
 
 try:
     conn.execute(query)
-except Exception, e:
+except Exception as e:
     logger.info("Error running query, exception: {}".format(e))
