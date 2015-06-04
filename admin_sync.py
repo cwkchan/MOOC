@@ -18,7 +18,7 @@ from core.coursera import Course, Base
 
 import sys
 import argparse
-from datetime import datetime, timedelta
+from datetime import datetime
 from time import sleep
 
 from sqlalchemy.orm import sessionmaker
@@ -31,8 +31,8 @@ from selenium.webdriver.support import expected_conditions as EC
 parser = argparse.ArgumentParser(description='Syncs local database with Coursera Admin website.  This script will '
                                              'update data with respect to existing courses, but will not delete courses'
                                              ' from the database.  To do that, use --clean.')
-parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not.  This will '
-                                                         'drop the table indiscriminately, proceed with caution.')
+parser.add_argument('--clean', action='store_true', help="Whether to drop tables in the database or not."
+                                            "This is required to be true for the script to proceed")
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
 parser.add_argument('--username', action='store',
                     help="The username to connect to log into the Coursera site with, checks config.properties for "
@@ -40,23 +40,19 @@ parser.add_argument('--username', action='store',
 parser.add_argument('--password', action='store',
                     help="The password to connect to log into the Coursera site with, checks config.properties for "
                          "username if this value does not exist")
-parser.add_argument('--update', action='store_true', help='Whether to update the local database of coursera courses.'
-                                                          'This will launch a firefox instance and scrape the web.')
-parser.add_argument('--verify', action='store_true', help='Whether to verify if files have been downloaded from '
-                                                          'Coursera')
+
 args = parser.parse_args()
+
+if not args.clean:
+    print("Please use the --clean as an argument. It will delete all the data from coursera_index and reload it")
+    sys.exit(1)
 
 logger = get_logger("admin_sync.py", args.verbose)
 conn = get_connection()
 
-try:
-    username, password = username_and_password_exist(args)
-except Exception as e:
-    print("Error: No username or password found.")
-    parser.print_help()
-    sys.exit(1)
+username, password = username_and_password_exist(args)
 
-if args.clean:
+def create_index():
     query = '''DROP TABLE IF EXISTS {}'''.format(Course.__tablename__)
     try:
         conn.execute(query)
@@ -82,7 +78,7 @@ if args.clean:
     try:
         conn.execute(query)
     except Exception as e:
-        logger.fatal("Failed to create new table for index on --clean")
+        logger.fatal("Failed to create new table for index")
 
 
 def load_course_details(course, browser, delay=3):
@@ -168,57 +164,7 @@ def update_database():
     for course in courses:
         session.add(Course(**course))
     session.commit()
-
     browser.close()
 
-def verify_courses():
-    Base.metadata.create_all(conn)
-    Session = sessionmaker(bind=conn)
-    session = Session()
-
-    missing_clickstream=[]
-    missing_sql=[]
-    missing_intent=[]
-    missing_demographics=[]
-    missing_pii=[]
-
-    for course in session.query(Course):
-        # todo: Eventually this should use the end time of the course, but that is unreliable on old courses.
-        if course.start is not None:
-            if datetime.today() - course.start > timedelta(days=106):
-                if not course.has_clickstream():
-                    missing_clickstream.append(course)
-                if not course.has_sql():
-                    missing_sql.append(course)
-                if not course.has_intent():
-                    missing_intent.append(course)
-                if not course.has_demographics():
-                    missing_demographics.append(course)
-                if not course.has_pii():
-                    missing_pii.append(course)
-
-    print("The following courses are missing clickstream files: ")
-    for course in missing_clickstream:
-        print(course.session_id, end=', ')
-    print("\nThe following courses are missing sql files: ")
-    for course in missing_sql:
-        print(course.session_id, end=', ')
-    print("\nThe following courses are missing intent files: ")
-    for course in missing_intent:
-        print(course.session_id, end=', ')
-    print("\nThe following courses are missing demographics files: ")
-    for course in missing_demographics:
-        print(course.session_id, end=', ')
-    print("\nThe following courses are missing pii files: ")
-    for course in missing_pii:
-        print(course.session_id, end=', ')
-    print("\n\nTo request up to date files please see https://docs.google.com/a/umich.edu/forms/d/1VI9G_0uU2tr7-0hFNINOl8Gi79Tw0Dme4BsilLCixgM/viewform")
-
-# todo there must be a slicker argsparser way to do this
-if not args.update and not args.verify:
-    print("You must use either --update or --verify.")
-else:
-    if args.update:
-        update_database()
-    if args.verify:
-        verify_courses()
+create_index()
+update_database()
