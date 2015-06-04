@@ -1,0 +1,10 @@
+#Username for mysql database which has create schema permissions
+user=
+#Password for mysql Username
+password=
+#Database IP
+db_server=
+#Directory containing the coursera sql files
+home_dir=
+#Temporary file for all the databases
+temporary_file=/tmp/database_list.tmp
