@@ -74,7 +74,7 @@ class Course(Base):
     def has_pii(self):
         """Determines whether the pii files for this course have already been downloaded.
 
-        :return: True if an pii file exists in the position get_properties()['intent'], False if it doesn't
+        :return: True if an pii file exists in the position get_properties()['pii'], False if it doesn't
         """
         return path.isfile("{}/{}.csv".format(get_properties()['pii'], str(self.session_id)))
 
