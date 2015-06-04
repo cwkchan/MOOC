@@ -22,33 +22,45 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-'''the amount of time to set the implicit wait too'''
 SECONDS_TO_WAIT = 15
-'''how many times to try and load an individual course page'''
+"""the amount of time to set the implicit wait too"""
 MAX_RETRIES = 5
-'''the amount of time to sleep between individual course reloads'''
+"""how many times to try and load an individual course page"""
 MAX_RETRIES_WAIT = 10
-'''This is the login URL for Coursera which will give back cookies'''
+"""the amount of time to sleep between individual course reloads"""
 LOGIN_URL = 'https://accounts.coursera.org/signin?mode=signin&post_redirect=%2F'
-'''This is the admin page which lists all of the courses'''
+"""This is the login URL for Coursera which will give back cookies"""
 ADMIN_URL = 'https://www.coursera.org/admin/'
-'''This is the URL to a single course download page'''
+"""This is the admin page which lists all of the courses"""
 SESSION_URL = 'https://www.coursera.org/admin/data/sessions/{}'
+"""This is the URL to a single course download page"""
+
 
 def username_and_password_exist(args):
-        if args.username is None:
-            username = get_properties()['username']
-        else:
-            username = args.username
-        if args.password is None:
-            password = get_properties()['password']
-        else:
-            password = args.password
-        if username is None or password is None:
-            raise Exception("No username or password found.")
-        return (username, password)
+    """Checks the availability of the username and password according to arguments passed or properties file.
+        :return: username and password
+    """
+    if args.username and args.username.strip():
+                username = args.username
+    else:
+        username = get_properties().get('username', None)
+
+    if args.password and args.password.strip():
+                password = args.password
+    else:
+        password = get_properties().get('password', None)
+
+    if username and username.strip() and password and password.strip():
+        return username, password
+    else:
+        print("Username and/or Password are missing. "
+                        "Please update the config files or pass the arguments --username and --password ")
+        raise Exception ("Missing username or password")
+
 
 def login_coursera_website(browser, username, password):
+    """Logs into the coursera website using the username password.
+    """
     try:
         browser.implicitly_wait(SECONDS_TO_WAIT)
         browser.get(LOGIN_URL)
@@ -60,6 +72,9 @@ def login_coursera_website(browser, username, password):
         print("Signing into Coursera failed. Please check your login information and/or network connection")
 
 def build_coursera_opener(browser):
+    """creates an opener for the for cookies.
+        :return: opener
+    """
     try:
         cj = http.cookiejar.CookieJar()
         for item in browser.get_cookies():
@@ -67,6 +82,7 @@ def build_coursera_opener(browser):
                                   item['path'], None, item['secure'], item['expiry'], None, None, None, None)
             cj.set_cookie(c)
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+        return opener
     except Exception as e:
         print("Creation of Coursera Opener failed")
-    return opener
+        return None
