@@ -31,8 +31,9 @@ from selenium.webdriver.support import expected_conditions as EC
 parser = argparse.ArgumentParser(description='Syncs local database with Coursera Admin website.  This script will '
                                              'update data with respect to existing courses, but will not delete courses'
                                              ' from the database.  To do that, use --clean.')
-parser.add_argument('--clean', action='store_true', help="Whether to drop tables in the database or not."
-                                            "This is required to be true for the script to proceed")
+parser.add_argument('--clean', required=True, help="This is a limitation of the script and it has to reload the database at every run "
+                                             "As of now, the script is unable to accomodate updates."
+                                             "This needs to be provided for the script to proceed")
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
 parser.add_argument('--username', action='store',
                     help="The username to connect to log into the Coursera site with, checks config.properties for "
@@ -44,7 +45,10 @@ parser.add_argument('--password', action='store',
 args = parser.parse_args()
 
 if not args.clean:
-    print("Please use the --clean as an argument. It will delete all the data from coursera_index and reload it")
+    print("Please use the --clean as an argument. It will delete all the data from coursera_index and reload it"
+          "This is a limitation of the script and it has to reload the database at every run "
+          "As of now, the script is unable to accomodate updates."
+          "This needs to be provided for the script to proceed")
     sys.exit(1)
 
 logger = get_logger("admin_sync.py", args.verbose)
