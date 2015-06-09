@@ -91,3 +91,9 @@ class Course(Base):
             return "{}/{}.csv".format(get_properties()['intent'], str(self.session_id))
         else:
             return None
+
+    def get_pii_filename(self):
+        if self.has_pii():
+            return "{}/{}.csv".format(get_properties()['pii'], str(self.session_id))
+        else:
+            return None

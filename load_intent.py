@@ -28,7 +28,7 @@ from core.coursera import Course, Base
 
 parser = argparse.ArgumentParser(description='Import coursera intent files into the database.  Will check which courses'
                                              'have not have files loaded into the DB and attempt to load them.')
-parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
+parser.add_argument('--clean', action='store_true', help='Whether to drop the table in the database to load from scratch or not')
 parser.add_argument('--verbose', action='store_true', help='If this flag exists extended logging will be on')
 args = parser.parse_args()
 
@@ -42,14 +42,16 @@ if args.clean:
     except:
         pass
 
-    query = """CREATE TABLE `uselab_mooc`.`coursera_intent` (`user_id` INT NOT NULL,
-  `session_id` VARCHAR(255) NOT NULL,
-  `submission_ts` TIMESTAMP NOT NULL,
-  `choice_id` INT NOT NULL,
-  PRIMARY KEY (`user_id`, `session_id`, `choice_id`));
-    """
+query = """CREATE TABLE IF NOT EXISTS `coursera_intent` (
+            `intent_id` INT NOT NULL AUTO_INCREMENT,
+            `user_id` INT NOT NULL,
+            `session_id` VARCHAR(255) NOT NULL,
+            `submission_ts` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            `choice_id` INT NOT NULL,
+            PRIMARY KEY (`intent_id`)
+            ) ; """
 
-    conn.execute(query)
+conn.execute(query)
 
 Base.metadata.create_all(conn)
 Session = sessionmaker(bind=conn)
@@ -64,6 +66,7 @@ def __intent_loaded(course):
     if result != 0:
         return True
     return False
+
 
 for course in session.query(Course):
     if not __intent_loaded(course) and course.has_intent():
