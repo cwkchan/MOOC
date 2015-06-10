@@ -54,15 +54,16 @@ opener=build_coursera_opener(browser)
 
 Session = sessionmaker(bind=conn)
 session = Session()
-pii = pandas.DataFrame()
 
 for course in session.query(Course):
     try:
         print("Working with {}".format(course.session_id))
+        pii = pandas.DataFrame()
         f = opener.open('https://class.coursera.org/{}/data/export/pii_download'.format(course.session_id))
         lines = f.read().decode('utf-8')
         pii = pii.append(pandas.read_csv(StringIO(lines)))
+        pii.to_csv("{}/{}_pii.csv".format((get_properties()['pii']), course.session_id),index=False)
     except Exception as e:
         print("Received an error {} for URL: {}".format(e,'https://class.coursera.org/{}/data/export/pii_download'.format(course.session_id)))
 
-pii.to_csv("{}/pii.csv".format(get_properties()['pii']),index=False)
+browser.close()
