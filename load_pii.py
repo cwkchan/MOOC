@@ -47,11 +47,12 @@ if args.clean:
 
 query = """CREATE TABLE IF NOT EXISTS `coursera_pii` (
         `pii_id` INT NOT NULL AUTO_INCREMENT NOT NULL,
-        `full_name` VARCHAR(255) NOT NULL,
-        `email_address` VARCHAR(255) NOT NULL,
         `coursera_user_id` INT NOT NULL,
-        `session_user_id` VARCHAR(255) NOT NULL,
-        `forum_user_id` VARCHAR(255) NOT NULL,
+        `access_group` VARCHAR(255) NOT NULL,
+        `email_address` VARCHAR(255) NOT NULL,
+        `full_name` VARCHAR(255) NOT NULL,
+        `last_access_ip` INT NOT NULL,
+        `deleted` INT NOT NULL,
         `session_id` VARCHAR(255) NOT NULL,
         PRIMARY KEY (`pii_id`));
         """

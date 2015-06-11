@@ -62,7 +62,7 @@ for course in session.query(Course):
         f = opener.open('https://class.coursera.org/{}/data/export/pii_download'.format(course.session_id))
         lines = f.read().decode('utf-8')
         pii = pii.append(pandas.read_csv(StringIO(lines)))
-        pii.to_csv("{}/{}_pii.csv".format((get_properties()['pii']), course.session_id),index=False)
+        pii.to_csv("{}/{}.csv".format((get_properties()['pii']), course.session_id),index=False)
     except Exception as e:
         print("Received an error {} for URL: {}".format(e,'https://class.coursera.org/{}/data/export/pii_download'.format(course.session_id)))
 
