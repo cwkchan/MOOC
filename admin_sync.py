@@ -31,7 +31,7 @@ from selenium.webdriver.support import expected_conditions as EC
 parser = argparse.ArgumentParser(description='Syncs local database with Coursera Admin website.  This script will '
                                              'update data with respect to existing courses, but will not delete courses'
                                              ' from the database.  To do that, use --clean.')
-parser.add_argument('--clean', required=True, help="This is a limitation of the script and it has to reload the database at every run "
+parser.add_argument('--clean', action='store_true', help="This is a limitation of the script and it has to reload the database at every run "
                                              "As of now, the script is unable to accomodate updates."
                                              "This needs to be provided for the script to proceed")
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
@@ -45,10 +45,10 @@ parser.add_argument('--password', action='store',
 args = parser.parse_args()
 
 if not args.clean:
-    print("Please use the --clean as an argument. It will delete all the data from coursera_index and reload it"
-          "This is a limitation of the script and it has to reload the database at every run "
-          "As of now, the script is unable to accomodate updates."
-          "This needs to be provided for the script to proceed")
+    print("\nPlease use the --clean as an argument. It will delete all the data from coursera_index and reload it"
+          "\nThis is a limitation of the script and it has to reload the database at every run "
+          "\nAs of now, the script is unable to accomodate updates."
+          "\nThis needs to be provided for the script to proceed")
     sys.exit(1)
 
 logger = get_logger("admin_sync.py", args.verbose)
@@ -133,6 +133,8 @@ def update_database():
     sleep(5)
 
     courses = []
+    blacklist =(get_properties()['course_blacklist'])
+
     for element in browser.find_elements_by_class_name("internal-site-admin"):
         #ignore links that are not sessions
         if "sessions/" not in element.get_attribute('href'):
@@ -143,8 +145,13 @@ def update_database():
         course_details = {
             'admin_id': int(element.get_attribute('href').split('/')[-1]),
             'session_id': element.get_attribute('text')[:-1]}
-        print("Adding data on {} to list.".format(course_details['session_id']))
-        courses.append(course_details)
+
+        if course_details['session_id'] not in blacklist:
+            print("Adding data on {} to list.".format(course_details['session_id']))
+            courses.append(course_details)
+        else :
+            print("Skipping the blacklisted course {}.".format(course_details['session_id']))
+
 
     #todo: wait for some ajax to finish, probably better to be an explicit wait on some element with a timeout
     sleep(5)
