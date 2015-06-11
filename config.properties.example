@@ -1,17 +1,22 @@
 [db]
-engine=mysql+mysqlconnector://username:pass@host/
-schema=uselab_mooc
-index=coursera_index
+#SERVER NAME
+engine=mysql+mysqlconnector://db_uname:db_password@db_host/
 
 [schemas]
-#schemas=course-001,course-002
+schema=name_of_the_base_db
+index=coursera_index
 
 [coursera]
-username=
-password=
+username=coursera_login
+password=coursera_password
 
 [ancillary]
-clickstream=
-demographics=
-intent=
-sql=
+clickstream=/path/to/coursera_clickstream_exports/
+demographics=/path/to/coursera_demographics/
+intent=/path/to/coursera_intent_exports/
+sql=/path/to/coursera_sql_exports/
+pii=/path/to/coursera_pii_exports/
+
+course_blacklist=course1,course2
+#Add the exact names of sessions. In case of one session, please add a comma in the end.
+~                                    
