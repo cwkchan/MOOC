@@ -14,13 +14,23 @@
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 import argparse
+import glob
+import sys
 
 parser = argparse.ArgumentParser(description='Print out table definitions for redshift based on mysql source')
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
-parser.add_argument('--file', action='store', help="The file to parse")
+parser.add_argument('--files', action='store', help="The file to parse")
 
 args = parser.parse_args()
 
+if args.files is None:
+    print("You must specify a file or set of files with a wildcard.  E.g. *.sql")
+    sys.exit(-1)
+else:
+    args.files=glob.glob(args.files)
+
+local_tables=[]
+other_tables=[]
 
 def str_contains(s, sub, exact=True):
     sub=sub.lower()
@@ -63,6 +73,9 @@ def parse_column(line):
     col_type=if_str_contains_then_replace(col_type,"SET","varchar")
     col_type=if_str_contains_then_replace(col_type,"YEAR","date")
 
+    #Rename the column if it is now a reserved word
+    if col_name=="default" or col_name=="order" or col_name=="ignore":
+        col_name="reserved_{}".format(col_name)
     #print(col_type)
     return (col_name, col_type)
 
@@ -86,15 +99,18 @@ def convert_create_statement(stmt):
             continue
         if line.lstrip().startswith("`"):
             columns.append(parse_column(line))
-
     create_stmt="CREATE TABLE {}(".format(table_name)
     for col in columns:
         create_stmt+="\n\t{} {},".format(col[0],col[1])
     create_stmt=create_stmt[:-1]+");"
-    print(create_stmt)
+    if table_name.find(".",0)!=-1:
+        other_tables.append(create_stmt)
+    else:
+        local_tables.append(create_stmt)
 
-if args.file is not None:
-    with open(args.file) as fil:
+
+for f in args.files:
+    with open(f) as fil:
         cur_create = None
         for line in fil:
             if line.startswith("CREATE TABLE") and cur_create is None:
@@ -107,3 +123,13 @@ if args.file is not None:
                 cur_create = None
             elif cur_create is not None:
                 cur_create += line
+
+for table in local_tables:
+    print(table)
+
+for table in other_tables:
+    # These tables have periods in the name.  Is this meant to put them in a new database?  A new schema?  Some of the
+    # tables have multiple periods in the name.  At the moment the strategy here is to replace the periods with an
+    # underscore so they can be put into redshift
+    table=table.replace(".","_")
+    print(table)
