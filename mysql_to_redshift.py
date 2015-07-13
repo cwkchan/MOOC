@@ -20,7 +20,8 @@ import sys
 parser = argparse.ArgumentParser(description='Print out table definitions for redshift based on mysql source')
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
 parser.add_argument('--files', action='store', help="The file to parse")
-
+parser.add_argument('--clean', action='store_true', help="Whether to issue a drop schema statement first or not")
+parser.add_argument('--schema', action='store', help="The schema to create the tables in, if not exists then the parser tries to guess from the filenames.")
 args = parser.parse_args()
 
 if args.files is None:
@@ -28,6 +29,13 @@ if args.files is None:
     sys.exit(-1)
 else:
     args.files=glob.glob(args.files)
+
+if args.schema is None:
+    try:
+        args.schema=args.files[0].split("(")[1].split(")")[0]
+    except:
+        print("Unable to detect schema for tables from filename, please specific with --schema")
+        sys.exit(-1)
 
 local_tables=[]
 other_tables=[]
@@ -123,6 +131,12 @@ for f in args.files:
                 cur_create = None
             elif cur_create is not None:
                 cur_create += line
+
+if args.clean:
+    print("DROP SCHEMA IF EXISTS {};".format(args.schema))
+
+print("CREATE SCHEMA {};".format(args.schema))
+print("SET search_path TO {};".format(args.schema))
 
 for table in local_tables:
     print(table)
