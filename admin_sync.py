@@ -63,21 +63,19 @@ def create_index():
     except Exception as e:
         pass
 
-    query='''CREATE TABLE `coursera_index` (
-  `session_id` varchar(255) DEFAULT NULL,
-  `admin_id` int(11) NOT NULL AUTO_INCREMENT,
-  `course` varchar(255) CHARACTER SET utf16 DEFAULT NULL,
-  `instructor` varchar(255) DEFAULT NULL,
-  `start` datetime DEFAULT NULL,
-  `end` datetime DEFAULT NULL,
-  `duration` int(11) DEFAULT NULL,
-  `enrollment` varchar(255) DEFAULT NULL,
-  `url` varchar(1024) DEFAULT NULL,
-  `allow_signature` tinyint(1) DEFAULT NULL,
-  PRIMARY KEY (`admin_id`),
-  UNIQUE KEY `admin_id` (`admin_id`),
-  UNIQUE KEY `ix_coursera_index_session_id` (`session_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=974755 DEFAULT CHARSET=latin1;'''
+    query= ('CREATE TABLE IF NOT EXISTS coursera_index(\n'
+            '  session_id VARCHAR(50),\n'
+            '  admin_id INTEGER NOT NULL,\n'
+            '  course VARCHAR(255),\n'
+            '  instructor VARCHAR(255),\n'
+            '  start_date DATE,\n'
+            '  end_date DATE,\n'
+            '  duration INTEGER,\n'
+            '  enrollment VARCHAR(255),\n'
+            '  url VARCHAR(255),\n'
+            '  allow_signature INTEGER,\n'
+            '  PRIMARY KEY(admin_id)\n'
+            ');')
 
     try:
         conn.execute(query)
@@ -111,10 +109,10 @@ def load_course_details(course, browser, delay=3):
         except:
             #its possible there is no day available, really old classes might be like this.
             day = '1'
-        course['start'] = datetime(int(year), int(month), int(day))
+        course['start_date'] = datetime(int(year), int(month), int(day))
         end_date = bdy.find_element_by_name('end_date').get_attribute("value")
         try:
-            course['end'] = datetime(int(end_date.split('-')[0]), int(end_date.split('-')[1]), int(end_date.split('-')[2]))
+            course['end_date'] = datetime(int(end_date.split('-')[0]), int(end_date.split('-')[1]), int(end_date.split('-')[2]))
         except:
             #it is possible for a course not to have an end date, again, old courses.
             pass

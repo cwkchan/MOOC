@@ -40,7 +40,7 @@ def get_connection(schema=None):
     config = get_properties()
     if (schema == None):
         return create_engine(config["engine"] + config["schema"])
-    return create_engine(config["engine"] + schema)
+    return create_engine(config["engine"] + schema).connect()
 
 
 def get_coursera_schema_list():
