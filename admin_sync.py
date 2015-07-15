@@ -88,7 +88,7 @@ def create_index():
 
 
 def load_course_details(course, browser, delay=3):
-    print(SESSION_URL.format(course['admin_id']))
+    #print(SESSION_URL.format(course['admin_id']))
     browser.get(SESSION_URL.format(course['admin_id']))
     # individual course pages
     #give the page a chance to load
@@ -178,7 +178,9 @@ def update_database():
     for course in courses:
         session.add(Course(**course))
     session.commit()
-    browser.close()
+
+    browser.quit()
+    display.stop()
 
 create_index()
 update_database()
