@@ -40,8 +40,8 @@ def verify_courses():
 
     for course in session.query(Course):
         # todo: Eventually this should use the end time of the course, but that is unreliable on old courses.
-        if course.start is not None:
-            if datetime.today() - course.start > timedelta(days=106):
+        if course.start_date is not None:
+            if datetime.today().date() - course.start_date > timedelta(days=106):
                 if not course.has_clickstream():
                     missing_clickstream.append(course)
                 if not course.has_sql():
