@@ -21,6 +21,7 @@ import argparse
 from datetime import datetime
 from time import sleep
 
+from pyvirtualdisplay import Display
 from sqlalchemy.orm import sessionmaker
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -55,6 +56,9 @@ logger = get_logger("admin_sync.py", args.verbose)
 conn = get_connection()
 
 username, password = username_and_password_exist(args)
+
+display = Display(visible=0, size=(800, 600))
+display.start()
 
 def create_index():
     query = '''DROP TABLE IF EXISTS {}'''.format(Course.__tablename__)
@@ -121,6 +125,7 @@ def load_course_details(course, browser, delay=3):
         #consider this malformed and just return None
         #todo: not sure what the implications are on trying to put it into the db.
         pass
+
 
 def update_database():
     browser = webdriver.Firefox()
