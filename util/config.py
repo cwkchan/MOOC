@@ -16,7 +16,6 @@
 import multiprocessing
 import queue
 import configparser as configparser
-from sqlalchemy import *
 import logging
 import os
 from ctypes import c_bool
@@ -34,38 +33,15 @@ def get_properties():
     return properties
 
 
-def get_connection(schema=None):
-    """Returns an sqlalchemy connection object, optionally connecting to a particular schema of interest.  If no schema
-    is used, the one marked as the index in the configuration file will be used. """
-    config = get_properties()
-    if (schema == None):
-        return create_engine(config["engine"] + config["schema"])
-    return create_engine(config["engine"] + schema).connect()
+#def get_connection(schema=None):
+#    """Returns an sqlalchemy connection object, optionally connecting to a particular schema of interest.  If no schema
+#    is used, the one marked as the index in the configuration file will be used. """
+#    config = get_properties()
+#    if (schema == None):
+#        return create_engine(config["engine"] + config["schema"]).connect()
+#    return create_engine(config["engine"] + schema).connect()
 
 
-def get_coursera_schema_list():
-    """Returns the list of courses, as db schemas, that should be processed. This list comes from either the
-    configuration file in the schemas section or, if that does not exist, it comes from the coursera_index table."""
-    config = get_properties()
-    if ("schemas" in config.keys()):
-        return config["schemas"].split(",")
-
-    query = "SELECT session_id FROM coursera_index WHERE start IS NOT NULL;"
-    conn = get_connection()
-    results = conn.execute(query)
-    schemas = []
-    for row in results:
-        schemas.append(row["session_id"])
-    return schemas
-
-
-def convert_sessionid_to_id(session_id):
-    """Converts a session id in the form of 'introfinance-001' to a primary key such as 2.  Simple wrapper to select
-    from the uselab_mooc.coursera_index table"""
-    conn = get_connection()
-    rs = conn.execute("SELECT admin_id FROM coursera_index WHERE session_id LIKE '{}'".format(session_id))
-    id = int(rs.fetchone()[0])
-    return id
 
 
 def get_logger(name, verbose=False):
