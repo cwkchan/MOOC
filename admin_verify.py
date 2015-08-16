@@ -14,18 +14,20 @@
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 from core.coursera import *
+from util.coursera_db import *
 
 import argparse
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import sessionmaker
 
+
 parser = argparse.ArgumentParser(description='Verifies that all the required files from coursera are present in the respective folders')
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
 
 args = parser.parse_args()
 logger = get_logger("admin_verify.py", args.verbose)
-conn = get_connection()
+conn = get_db_connection()
 
 def verify_courses():
     Base.metadata.create_all(conn)
