@@ -22,6 +22,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+logger = get_logger("coursera_web.py")
+
 SECONDS_TO_WAIT = 15
 """the amount of time to set the implicit wait too"""
 MAX_RETRIES = 5
@@ -53,7 +55,7 @@ def username_and_password_exist(args):
     if username and username.strip() and password and password.strip():
         return username, password
     else:
-        print("Username and/or Password are missing. "
+        logger.error("Username and/or Password are missing. "
                         "Please update the config files or pass the arguments --username and --password ")
         raise Exception ("Missing username or password")
 
@@ -69,7 +71,7 @@ def login_coursera_website(browser, username, password):
         browser.find_element_by_id('signin-password').send_keys(password)
         browser.find_element_by_class_name("coursera-signin-button").submit()
     except Exception as e:
-        print("Signing into Coursera failed. Please check your login information and/or network connection")
+        logger.error("Signing into Coursera failed. Please check your login information and/or network connection")
 
 def build_coursera_opener(browser):
     """creates an opener for the for cookies.
@@ -84,5 +86,6 @@ def build_coursera_opener(browser):
         opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
         return opener
     except Exception as e:
-        print("Creation of Coursera Opener failed")
+        logger.error("Creation of Coursera Opener failed")
         return None
+
