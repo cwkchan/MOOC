@@ -15,7 +15,7 @@
 
 from util.coursera_web import *
 from core.coursera import Course, Base
-
+from util.coursera_db import *
 import sys
 import argparse
 from datetime import datetime
@@ -53,7 +53,7 @@ if not args.clean:
     sys.exit(1)
 
 logger = get_logger("admin_sync.py", args.verbose)
-conn = get_connection()
+conn = get_db_connection()
 
 username, password = username_and_password_exist(args)
 
