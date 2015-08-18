@@ -58,9 +58,9 @@ def parse_column(line):
     col_type = tokens[1]
     # we ignore not null and default values
 
-    # print(col_type.split("(")[0])
+    #print(col_type.split("(")[0])
     # from https://www.flydata.com/resources/flydata-sync/data-type-mapping/
-    # print(line)
+    #print(line)
     col_type = if_str_contains_then_replace(col_type, "BINARY", "varchar")
     col_type = if_str_contains_then_replace(col_type, "BIT", "int8")
     col_type = if_str_contains_then_replace(col_type, "BLOB", "varchar(65535)")
@@ -74,10 +74,12 @@ def parse_column(line):
     col_type = if_str_contains_then_replace(col_type, "FIXED", "numeric")
     col_type = if_str_contains_then_replace(col_type, "FLOAT", "float4")
     col_type = if_str_contains_then_replace(col_type, "INT", "int8")
+    col_type = if_str_contains_then_replace(col_type, "LONGTEXT", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "TEXT", "varchar")
     col_type = if_str_contains_then_replace(col_type, "NUMERIC", "numeric")
     col_type = if_str_contains_then_replace(col_type, "SET", "varchar")
     col_type = if_str_contains_then_replace(col_type, "YEAR", "date")
+    #print(col_type)
 
     # Rename the column if it is now a reserved word
     if col_name == "default" or col_name == "order" or col_name == "ignore":
@@ -118,6 +120,7 @@ def convert_create_statement(stmt, local_tables, other_tables):
 def print_sql(files, clean, schema):
     local_tables = []
     other_tables = []
+    insert_statements = []
     query = []
 
     if schema is None:
@@ -128,7 +131,6 @@ def print_sql(files, clean, schema):
             exit(-1)
 
     schema = schema.replace('-', '_')
-    print(schema)
 
     for f in files:
         with open(f) as fil:
@@ -144,6 +146,11 @@ def print_sql(files, clean, schema):
                     cur_create = None
                 elif cur_create is not None:
                     cur_create += line
+                elif line.startswith("INSERT INTO") and cur_create is None:
+                    table_name = line.split()[2]
+                    ins_table_name = line.split()[2].replace('`', '').replace(".", "_")
+                    line = line.replace(table_name, ins_table_name).replace("%", "%%").replace("TABLES", "TABLE")
+                    insert_statements.append(line)
 
     if clean:
         query.append("DROP SCHEMA IF EXISTS {};".format(schema))
@@ -161,7 +168,9 @@ def print_sql(files, clean, schema):
         table = table.replace(".", "_")
         query.append(table)
 
-    #query.append(cur_create)
+    for line in insert_statements:
+        query.append(line)
+
     return '\n'.join(query)
 
 
