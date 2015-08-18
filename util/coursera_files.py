@@ -153,7 +153,7 @@ def print_sql(files, clean, schema):
                     insert_statements.append(line)
 
     if clean:
-        query.append("DROP SCHEMA IF EXISTS {};".format(schema))
+        query.append("DROP SCHEMA IF EXISTS {} CASCADE;".format(schema))
 
     query.append("CREATE SCHEMA {};".format(schema))
     query.append("SET search_path TO {};".format(schema))
