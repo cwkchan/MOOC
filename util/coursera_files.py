@@ -66,14 +66,14 @@ def parse_column(line):
     #print(line)
     col_type = if_str_contains_then_replace(col_type, "BINARY", "varchar")
     col_type = if_str_contains_then_replace(col_type, "BIT", "int8")
-    col_type = if_str_contains_then_replace(col_type, "BLOB", "varchar(65535)")
+    col_type = if_str_contains_then_replace(col_type, "BLOB", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "BOOL", "int2")
     col_type = if_str_contains_then_replace(col_type, "CHAR", "varchar")
     col_type = if_str_contains_then_replace(col_type, "DATE", "date")
     col_type = if_str_contains_then_replace(col_type, "TIME", "timestamp")
     col_type = if_str_contains_then_replace(col_type, "DEC", "numeric")
     col_type = if_str_contains_then_replace(col_type, "DOUBLE", "float8")
-    col_type = if_str_contains_then_replace(col_type, "ENUM", "varchar")
+    col_type = if_str_contains_then_replace(col_type, "ENUM", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "FIXED", "numeric")
     col_type = if_str_contains_then_replace(col_type, "FLOAT", "float4")
     col_type = if_str_contains_then_replace(col_type, "INT", "int8")
@@ -125,11 +125,11 @@ def insert_to_csv_string(stmt, schema):
         file_name = ("/tmp/{}.csv").format(schema + '.' + table_name)
         #print(filename)
         outfile = open(file_name, 'a')
-        full_statement= "tmp_stmt="+ stmt[stmt.find("("):-2].replace("NULL", "\"NULL\"").replace("\\n", " " )
+        full_statement= "tmp_stmt="+ stmt[stmt.find("("):-2].replace("NULL", "None").replace("\\n", " " )
         exec("global tmp_stmt; " + full_statement)
                 #write to csv
         try:
-            writer=csv.writer(outfile, quoting=csv.QUOTE_MINIMAL)
+            writer=csv.writer(outfile, delimiter='|', quoting=csv.QUOTE_ALL)
             for row in tmp_stmt:
                     writer.writerow(row)
         except NameError:
@@ -140,7 +140,7 @@ def insert_to_csv_string(stmt, schema):
 def print_sql(files, clean, schema):
     local_tables = []
     other_tables = []
-    copy_files = []
+    copy_files = set()
     create_queries = []
 
     if schema is None:
@@ -166,7 +166,7 @@ def print_sql(files, clean, schema):
                     cur_create += line
                 elif line.startswith("INSERT INTO") and cur_create is None:
                     (table_name) = insert_to_csv_string(line, schema)
-                    copy_files.append(table_name)
+                    copy_files.add(table_name)
     if clean:
         create_queries.append("DROP SCHEMA IF EXISTS {} CASCADE;".format(schema))
 
@@ -211,9 +211,9 @@ def upload_s3_file(source_filename, dest_dir):
     # to avoid cost of listing a bucket and since we use only one bucket, validation is turned OFF
 
     # max size in bytes before uploading in parts. between 1 and 5 GB recommended
-    MAX_SIZE = 20 * 1000 * 1000
+    MAX_SIZE = 5000 * 1000 * 1000
     # size of parts when uploading in parts
-    PART_SIZE = 6 * 1000 * 1000
+    PART_SIZE = 1000 * 1000 * 1000
 
     filename = [dir for dir in source_filename.split('/') if dir != ''][-1]
     destpath = os.path.join(dest_dir, filename)
@@ -227,7 +227,7 @@ def upload_s3_file(source_filename, dest_dir):
     filesize = os.path.getsize(source_filename)
     if filesize > MAX_SIZE:
         logger.info("Multipart upload")
-        mp = bucket.initiate_multipart_upload(destpath)
+        mp = bucket.initiate_multipart_upload(destpath, reduced_redundancy=true)
         fp = open(source_filename, 'rb')
         fp_num = 0
         while (fp.tell() < filesize):

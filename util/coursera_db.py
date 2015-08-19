@@ -65,6 +65,7 @@ def copy_s3_to_redshift(conn, s3path, table, schema= None, delim='\t', error=50,
         delimiter :delim
         maxerror :error
         removequotes
+        NULL AS 'null'
         ;
         """.format(table=text(table), aws_access_key=aws_access_key, aws_secret_key=aws_secret_key, error=error))    # copy command doesn't like table name or keys single-quoted
     print(copy)
