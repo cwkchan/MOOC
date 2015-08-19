@@ -14,8 +14,11 @@
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 from util.config import *
+from util.coursera_db import *
 
 import sys
+import io
+import csv
 
 import boto
 import boto.s3.connection
@@ -75,7 +78,7 @@ def parse_column(line):
     col_type = if_str_contains_then_replace(col_type, "FLOAT", "float4")
     col_type = if_str_contains_then_replace(col_type, "INT", "int8")
     col_type = if_str_contains_then_replace(col_type, "LONGTEXT", "varchar(max)")
-    col_type = if_str_contains_then_replace(col_type, "TEXT", "varchar")
+    col_type = if_str_contains_then_replace(col_type, "TEXT", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "NUMERIC", "numeric")
     col_type = if_str_contains_then_replace(col_type, "SET", "varchar")
     col_type = if_str_contains_then_replace(col_type, "YEAR", "date")
@@ -116,12 +119,29 @@ def convert_create_statement(stmt, local_tables, other_tables):
     else:
         local_tables.append(create_stmt)
 
+def insert_to_csv_string(stmt, schema):
+        #convert to python list
+        table_name = stmt.split()[2].replace('`','').replace('.','_')
+        file_name = ("/tmp/{}.csv").format(schema + '.' + table_name)
+        #print(filename)
+        outfile = open(file_name, 'a')
+        full_statement= "tmp_stmt="+ stmt[stmt.find("("):-2].replace("NULL", "\"NULL\"").replace("\\n", " " )
+        exec("global tmp_stmt; " + full_statement)
+                #write to csv
+        try:
+            writer=csv.writer(outfile, quoting=csv.QUOTE_MINIMAL)
+            for row in tmp_stmt:
+                    writer.writerow(row)
+        except NameError:
+            pass
+
+        return (table_name)
 
 def print_sql(files, clean, schema):
     local_tables = []
     other_tables = []
-    insert_statements = []
-    query = []
+    copy_files = []
+    create_queries = []
 
     if schema is None:
         try:
@@ -129,8 +149,6 @@ def print_sql(files, clean, schema):
         except:
             print("Unable to detect schema for tables from filename, please specific with --schema")
             exit(-1)
-
-    schema = schema.replace('-', '_')
 
     for f in files:
         with open(f) as fil:
@@ -147,31 +165,25 @@ def print_sql(files, clean, schema):
                 elif cur_create is not None:
                     cur_create += line
                 elif line.startswith("INSERT INTO") and cur_create is None:
-                    table_name = line.split()[2]
-                    ins_table_name = line.split()[2].replace('`', '').replace(".", "_")
-                    line = line.replace(table_name, ins_table_name).replace("%", "%%").replace("TABLES", "TABLE")
-                    insert_statements.append(line)
-
+                    (table_name) = insert_to_csv_string(line, schema)
+                    copy_files.append(table_name)
     if clean:
-        query.append("DROP SCHEMA IF EXISTS {} CASCADE;".format(schema))
+        create_queries.append("DROP SCHEMA IF EXISTS {} CASCADE;".format(schema))
 
-    query.append("CREATE SCHEMA {};".format(schema))
-    query.append("SET search_path TO {};".format(schema))
+    create_queries.append("CREATE SCHEMA {};".format(schema))
+    create_queries.append("SET search_path TO {};".format(schema))
 
     for table in local_tables:
-        query.append(table)
+        create_queries.append(table)
 
     for table in other_tables:
         # These tables have periods in the name.  Is this meant to put them in a new database?  A new schema?  Some of the
         # tables have multiple periods in the name.  At the moment the strategy here is to replace the periods with an
         # underscore so they can be put into redshift
         table = table.replace(".", "_")
-        query.append(table)
+        create_queries.append(table)
 
-    for line in insert_statements:
-        query.append(line)
-
-    return '\n'.join(query)
+    return (create_queries, copy_files)
 
 
 def upload_files_to_s3(type):

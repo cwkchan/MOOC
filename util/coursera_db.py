@@ -48,9 +48,12 @@ def convert_sessionid_to_id(session_id):
     return id
 
 #adapted from http://stackoverflow.com/questions/28271049/redshift-copy-operation-doesnt-work-in-sqlalchemy
-def copy_s3_to_redshift(conn, s3path, table, delim='\t', error=50, ignoreheader=1):
+def copy_s3_to_redshift(conn, s3path, table, schema= None, delim='\t', error=50, ignoreheader=1):
     aws_access_key = get_properties().get('access_id', None)
     aws_secret_key = get_properties().get('secret_key', None)
+
+    if (schema is None):
+        schema = "public"
 
     copy = text("""
         copy "{table}"
@@ -65,6 +68,11 @@ def copy_s3_to_redshift(conn, s3path, table, delim='\t', error=50, ignoreheader=
         ;
         """.format(table=text(table), aws_access_key=aws_access_key, aws_secret_key=aws_secret_key, error=error))    # copy command doesn't like table name or keys single-quoted
     print(copy)
+
     trans = conn.begin()
+    conn.execute("SET search_path TO {};".format(schema))
     conn.execute(copy, s3path=s3path, delim=delim, ignoreheader=ignoreheader or 0, error=error)
     trans.commit()
+
+
+
