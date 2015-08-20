@@ -22,6 +22,7 @@ import csv
 
 import boto
 import boto.s3.connection
+import traceback
 
 logger = get_logger("coursera_files.py")
 
@@ -65,10 +66,11 @@ def parse_column(line):
     # from https://www.flydata.com/resources/flydata-sync/data-type-mapping/
     #print(line)
     col_type = if_str_contains_then_replace(col_type, "BINARY", "varchar")
+    col_type = if_str_contains_then_replace(col_type, "CHAR", "varchar")
     col_type = if_str_contains_then_replace(col_type, "BIT", "int8")
+    col_type = if_str_contains_then_replace(col_type, "MEDIUMBLOB", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "BLOB", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "BOOL", "int2")
-    col_type = if_str_contains_then_replace(col_type, "CHAR", "varchar")
     col_type = if_str_contains_then_replace(col_type, "DATE", "date")
     col_type = if_str_contains_then_replace(col_type, "TIME", "timestamp")
     col_type = if_str_contains_then_replace(col_type, "DEC", "numeric")
@@ -135,6 +137,9 @@ def insert_to_csv_string(stmt, schema):
         except NameError:
             pass
 
+        except csv.Error:
+            logger.error("Value : {}".format(tmp_stmt))
+            logger.exception(traceback.format_exc(), file=sys.stderr, flush=True)
         return (table_name)
 
 def print_sql(files, clean, schema):
@@ -165,8 +170,9 @@ def print_sql(files, clean, schema):
                 elif cur_create is not None:
                     cur_create += line
                 elif line.startswith("INSERT INTO") and cur_create is None:
-                    (table_name) = insert_to_csv_string(line, schema)
-                    copy_files.add(table_name)
+                    pass
+                    # (table_name) = insert_to_csv_string(line, schema)
+                    # copy_files.add(table_name)
     if clean:
         create_queries.append("DROP SCHEMA IF EXISTS {} CASCADE;".format(schema))
 
