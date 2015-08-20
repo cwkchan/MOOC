@@ -13,7 +13,7 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
-from util.config import *
+from util.coursera_db import *
 from core.coursera import Course, Base
 
 import argparse
@@ -36,7 +36,7 @@ parser.add_argument('--verbose', action='store_true', help='If this flag exists 
 args = parser.parse_args()
 
 logger = get_logger("load_pii.py", args.verbose)
-conn = get_connection()
+conn = get_db_connection()
 
 if args.clean:
     query = "DROP TABLE IF EXISTS coursera_pii"
@@ -45,17 +45,17 @@ if args.clean:
     except:
         pass
 
-query = """CREATE TABLE IF NOT EXISTS `coursera_pii` (
-        `pii_id` INT NOT NULL AUTO_INCREMENT NOT NULL,
-        `coursera_user_id` INT NOT NULL,
-        `access_group` VARCHAR(255) NOT NULL,
-        `email_address` VARCHAR(255) NOT NULL,
-        `full_name` VARCHAR(255) NOT NULL,
-        `last_access_ip` INT NOT NULL,
-        `deleted` INT NOT NULL,
-        `session_id` VARCHAR(255) NOT NULL,
-        PRIMARY KEY (`pii_id`));
-        """
+query = ("CREATE TABLE IF NOT EXISTS coursera_pii (\n"
+         "    user_id INTEGER NOT NULL,\n"
+         "    session_id VARCHAR(255) NOT NULL,\n"
+         "    name VARCHAR(255) DEFAULT NULL,\n"
+         "    email VARCHAR(255) DEFAULT NULL,\n"
+         "    first_name VARCHAR(255) DEFAULT NULL,\n"
+         "    middle_name VARCHAR(255) DEFAULT NULL,\n"
+         "    last_name VARCHAR(255) DEFAULT NULL,\n"
+         "    name_cleaning_confidence FLOAT DEFAULT NULL,\n"
+         "    PRIMARY KEY (user_id, session_id)\n"
+         "    );")
 conn.execute(query)
 
 Base.metadata.create_all(conn)

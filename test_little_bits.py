@@ -26,10 +26,10 @@ import os.path
 s3_path = (get_properties().get('s3_path', None) + 'coursera_exports_sql/')
 exports = (get_properties().get('sql',None))
 
-set = ['introfinance-004']
+set = ['fantasysf-005']
 for schema in set:
+    logger.info("Loading schema : {} \n".format(schema))
     file = ("{}*{}*.sql".format(exports, schema))
-    print(file)
     files = glob.glob(file)
     schema = schema.replace('-', '_')
     (create_queries, copy_files) = print_sql(files, true, schema)
@@ -46,17 +46,16 @@ for schema in set:
             logger.exception("This file : {} could not be uploaded to S3. Please update manually".format(file_name))
             logger.exception(traceback.format_exc(limit=None))
 
-
         try:
             copy_s3_to_redshift(connection, path, table, schema=schema, delim='|', error=10, ignoreheader=0)
         except:
             logger.exception("This table : {} could not be loaded from the file : {}. Please check pgcatalog.stl_load_errors".format(table,path ))
             logger.exception(traceback.format_exc(limit=None))
-            pass
+
         else:
             os.remove(file_name)
 
         logger.info("Table successfully created".format(table))
 
-    logger.info("File upload completed for schema : {}".format(schema))
+    logger.info("File upload completed for schema : {} \n\n".format(schema))
 

@@ -139,7 +139,8 @@ def insert_to_csv_string(stmt, schema):
 
         except csv.Error:
             logger.error("Value : {}".format(tmp_stmt))
-            logger.exception(traceback.format_exc(), file=sys.stderr, flush=True)
+            logger.exception(traceback.format_exc(limit=None))
+        outfile.close()
         return (table_name)
 
 def print_sql(files, clean, schema):
