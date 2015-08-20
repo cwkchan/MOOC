@@ -170,9 +170,8 @@ def print_sql(files, clean, schema):
                 elif cur_create is not None:
                     cur_create += line
                 elif line.startswith("INSERT INTO") and cur_create is None:
-                    pass
-                    # (table_name) = insert_to_csv_string(line, schema)
-                    # copy_files.add(table_name)
+                    (table_name) = insert_to_csv_string(line, schema)
+                    copy_files.add(table_name)
     if clean:
         create_queries.append("DROP SCHEMA IF EXISTS {} CASCADE;".format(schema))
 
