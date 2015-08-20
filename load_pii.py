@@ -37,6 +37,8 @@ args = parser.parse_args()
 
 logger = get_logger("load_pii.py", args.verbose)
 conn = get_db_connection()
+config = get_properties()
+connection = create_engine(config["engine"] + 'uselab_mooc')
 
 if args.clean:
     query = "DROP TABLE IF EXISTS coursera_pii"
@@ -45,17 +47,17 @@ if args.clean:
     except:
         pass
 
-query = ("CREATE TABLE IF NOT EXISTS coursera_pii (\n"
-         "    user_id INTEGER NOT NULL,\n"
-         "    session_id VARCHAR(255) NOT NULL,\n"
-         "    name VARCHAR(255) DEFAULT NULL,\n"
-         "    email VARCHAR(255) DEFAULT NULL,\n"
-         "    first_name VARCHAR(255) DEFAULT NULL,\n"
-         "    middle_name VARCHAR(255) DEFAULT NULL,\n"
-         "    last_name VARCHAR(255) DEFAULT NULL,\n"
-         "    name_cleaning_confidence FLOAT DEFAULT NULL,\n"
-         "    PRIMARY KEY (user_id, session_id)\n"
-         "    );")
+query = (""
+         "CREATE TABLE IF NOT EXISTS coursera_pii ("
+         "coursera_user_id INTEGER NOT NULL,"
+         "session_id VARCHAR(255) NOT NULL,"
+         "access_group VARCHAR(255) NOT NULL,"
+         "email_address VARCHAR(255) DEFAULT NULL,"
+         "full_name VARCHAR(255) DEFAULT NULL,"
+         "last_access_ip VARCHAR(255) DEFAULT NULL,"
+         "deleted INTEGER DEFAULT NULL,"
+         "PRIMARY KEY (coursera_user_id, session_id)"
+         ");")
 conn.execute(query)
 
 Base.metadata.create_all(conn)
@@ -76,4 +78,4 @@ for course in session.query(Course):
     if not __pii_loaded(course) and course.has_pii():
         df = pandas.read_csv(course.get_pii_filename())
         df["session_id"]=course.session_id
-        df.to_sql('coursera_pii', conn, if_exists='append', index=False)
+        df.to_sql('coursera_pii', connection, if_exists='append', index=False)
