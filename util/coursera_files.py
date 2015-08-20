@@ -138,7 +138,8 @@ def insert_to_csv_string(stmt, schema):
             pass
 
         except csv.Error:
-            logger.error("Value : {}".format(tmp_stmt))
+            logger.error("Value : {} in file : {} to load table : {}".format(tmp_stmt, file_name, table_name))
+            logger.error("Value of row is {}".format(row))
             logger.exception(traceback.format_exc(limit=None))
         outfile.close()
         return (table_name)
