@@ -16,6 +16,8 @@
 from util.config import *
 from sqlalchemy import *
 
+logger = get_logger("coursera_files.py")
+
 def get_db_connection(schema=None):
     """Returns an sqlalchemy connection object, optionally connecting to a particular schema of interest.  If no schema
     is used, the one marked as the index in the configuration file will be used. """
@@ -68,8 +70,8 @@ def copy_s3_to_redshift(conn, s3path, table, schema= None, delim='\t', error=50,
         NULL AS 'null'
         ;
         """.format(table=text(table), aws_access_key=aws_access_key, aws_secret_key=aws_secret_key, error=error))    # copy command doesn't like table name or keys single-quoted
-    print(copy)
 
+    logger.info("Copying the file : {} from S3 to table : {}.{} ".format(s3path, schema, table))
     trans = conn.begin()
     conn.execute("SET search_path TO {};".format(schema))
     conn.execute(copy, s3path=s3path, delim=delim, ignoreheader=ignoreheader or 0, error=error)

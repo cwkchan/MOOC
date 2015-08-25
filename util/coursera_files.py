@@ -22,6 +22,7 @@ import csv
 
 import boto
 import boto.s3.connection
+import traceback
 
 logger = get_logger("coursera_files.py")
 
@@ -65,10 +66,11 @@ def parse_column(line):
     # from https://www.flydata.com/resources/flydata-sync/data-type-mapping/
     #print(line)
     col_type = if_str_contains_then_replace(col_type, "BINARY", "varchar")
+    col_type = if_str_contains_then_replace(col_type, "CHAR", "varchar")
     col_type = if_str_contains_then_replace(col_type, "BIT", "int8")
+    col_type = if_str_contains_then_replace(col_type, "MEDIUMBLOB", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "BLOB", "varchar(max)")
     col_type = if_str_contains_then_replace(col_type, "BOOL", "int2")
-    col_type = if_str_contains_then_replace(col_type, "CHAR", "varchar")
     col_type = if_str_contains_then_replace(col_type, "DATE", "date")
     col_type = if_str_contains_then_replace(col_type, "TIME", "timestamp")
     col_type = if_str_contains_then_replace(col_type, "DEC", "numeric")
@@ -135,6 +137,11 @@ def insert_to_csv_string(stmt, schema):
         except NameError:
             pass
 
+        except csv.Error:
+            logger.error("Value : {} in file : {} to load table : {}".format(tmp_stmt, file_name, table_name))
+            logger.error("Value of row is {}".format(row))
+            logger.exception(traceback.format_exc(limit=None))
+        outfile.close()
         return (table_name)
 
 def print_sql(files, clean, schema):
