@@ -39,7 +39,7 @@ class Course(Base):
         return "Course {} has an admin_id of {}, is called {} and starts on {}.".format(self.session_id,
                                                                                                   self.admin_id,
                                                                                                   self.course,
-                                                                                                  str(self.start))
+                                                                                                  str(self.start_date))
 
     def has_clickstream(self):
         """Determines whether the clickstream files for this course have already been downloaded.

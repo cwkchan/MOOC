@@ -16,7 +16,7 @@
 from util.config import *
 from sqlalchemy import *
 
-logger = get_logger("coursera_files.py")
+logger = get_logger("coursera_db.py")
 
 def get_db_connection(schema=None):
     """Returns an sqlalchemy connection object, optionally connecting to a particular schema of interest.  If no schema
