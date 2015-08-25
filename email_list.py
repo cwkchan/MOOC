@@ -76,7 +76,7 @@ for schema in schemas:
 
 # todo: this is a shitty way to turn the elements of a set into a query
 query="""
-select email_address, full_name from public.coursera_pii where coursera_user_id in ({});""".format(str(users)).replace("{","").replace("}","")
+select distinct email_address, full_name from public.coursera_pii where coursera_user_id in ({});""".format(str(users)).replace("{","").replace("}","")
 rs=conn.execute(query)
 
 with open('out.csv', 'w') as csvfile:
