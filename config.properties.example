@@ -4,11 +4,18 @@ engine=postgresql+psycopg2://user:pass@host:5439/
 
 [schemas]
 schema=name_of_the_base_db
+#to be updated. Please disregard for now
 index=coursera_index
 
 [coursera]
 username=coursera_login
 password=coursera_password
+
+[sthree]
+access_id=S3_access_id_from_aws
+secret_key=S3_secret_key_from_aws
+s3_path=S3_path_for_boto
+bucket=S3_bucket_name
 
 [ancillary]
 clickstream=/path/to/coursera_clickstream_exports/
@@ -16,6 +23,8 @@ demographics=/path/to/coursera_demographics/
 intent=/path/to/coursera_intent_exports/
 sql=/path/to/coursera_sql_exports/
 pii=/path/to/coursera_pii_exports/
+sql_working_directory=temp_dir_for_files_creation
+#files are deleted if successfully uploaded to S3. /tmp might run out of space
 course_blacklist=course1,course2
 #Add the exact names of sessions. In case of one session, please add a comma in the end.
 
