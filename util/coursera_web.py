@@ -21,10 +21,13 @@ import urllib.request
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.firefox.firefox_profile import FirefoxProfile
+
 
 logger = get_logger("coursera_web.py")
 
-SECONDS_TO_WAIT = 15
+SECONDS_TO_WAIT = 30
 """the amount of time to set the implicit wait too"""
 MAX_RETRIES = 5
 """how many times to try and load an individual course page"""
@@ -73,6 +76,14 @@ def login_coursera_website(browser, username, password):
     except Exception as e:
         logger.error("Signing into Coursera failed. Please check your login information and/or network connection")
 
+def get_download_profile():
+    profile = FirefoxProfile()
+    profile.set_preference("browser.helperApps.neverAsk.saveToDisk", 'application/csv')
+    profile.set_preference("browser.download.panel.shown", False)
+    profile.set_preference("browser.helperApps.neverAsk.openFile","text/csv,application/vnd.ms-excel")
+    profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "text/csv,application/vnd.ms-excel")
+    return profile
+
 def build_coursera_opener(browser):
     """creates an opener for the for cookies.
         :return: opener
@@ -89,3 +100,9 @@ def build_coursera_opener(browser):
         logger.error("Creation of Coursera Opener failed")
         return None
 
+def check_exists_by_xpath(xpath, browser):
+    try:
+        browser.find_element_by_xpath(xpath)
+    except NoSuchElementException:
+        return False
+    return True
