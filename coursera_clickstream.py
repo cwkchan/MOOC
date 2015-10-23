@@ -14,9 +14,9 @@
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 import multiprocessing
+from util.coursera_db import *
 import argparse
 from threading import Condition, RLock
-from util.config import *
 from util.url_parser import *
 import sys
 from sqlalchemy import *
@@ -112,7 +112,7 @@ else:
     else:
         raise Exception("One of files or directory is require.")
 
-conn = get_connection()
+conn = get_db_connection()
 BATCH_SIZE = 1000
 
 if args.clean:

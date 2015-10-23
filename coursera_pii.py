@@ -29,7 +29,7 @@ group.add_argument('--dir', help='A directory with CSV files in it')
 args = parser.parse_args()
 
 logger = get_logger("coursera_clickstream.py", args.verbose)
-conn = get_connection()
+conn = get_db_connection()
 
 if args.clean:
     query = 'DROP TABLE IF EXISTS `coursera_pii`'

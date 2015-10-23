@@ -14,6 +14,7 @@
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
 from util.coursera_web import *
+from util.coursera_db import *
 from core.coursera import Course
 
 import sys
@@ -37,7 +38,7 @@ parser.add_argument('--password', action='store',
 
 args = parser.parse_args()
 logger = get_logger("retrieve_pii.py", args.verbose)
-conn = get_connection()
+conn = get_db_connection()
 
 try:
     username, password = username_and_password_exist(args)
