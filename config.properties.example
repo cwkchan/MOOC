@@ -1,6 +1,6 @@
 [db]
 #SERVER NAME
-engine=mysql+mysqlconnector://db_uname:db_password@db_host/
+engine=postgresql+psycopg2://user:pass@host:5439/
 
 [schemas]
 schema=name_of_the_base_db
@@ -25,7 +25,10 @@ sql=/path/to/coursera_sql_exports/
 pii=/path/to/coursera_pii_exports/
 sql_working_directory=temp_dir_for_files_creation
 #files are deleted if successfully uploaded to S3. /tmp might run out of space
-
 course_blacklist=course1,course2
 #Add the exact names of sessions. In case of one session, please add a comma in the end.
-~                                    
+
+[other]
+qualtrics_token=
+# sometimes this has a hash sign in it, and this needs to be doubley escaped, e.g. brooksch#umich should be brooksch%%23umich
+qualtrics_username=

@@ -29,9 +29,6 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 parser = argparse.ArgumentParser(description='Downloads the assignments from the specified course')
-parser.add_argument('--schema', action='store',
-                    help="The schema to create the tables in. It is present in the filename in brackets."
-                         "Please use the accurate schema. Currently the schema name is not being verified")
 parser.add_argument('--assignment', action='store',
                     help="The assignment to download. PAss all to download all assignments.")
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
@@ -44,66 +41,35 @@ parser.add_argument('--password', action='store',
 
 args = parser.parse_args()
 
-if args.assignment is None:
-    print("You must specify a assignment number to download. pass all to download all assignments.")
-    sys.exit(-1)
-else:
-    if args.assignment == 'all':
-        all = True
-    else:
-        assignment = 'Assignment {} (quiz)'.format(args.assignment)
-        all = False
-
-print(assignment)
-if args.schema is None:
-    print("You must specify a schema.Please use the accurate schema. Currently the schema name is not being verified")
-    sys.exit(-1)
-
-schema = args.schema
-
-
-logger = get_logger("admin_sync.py", args.verbose)
-conn = get_db_connection()
-
 username, password = username_and_password_exist(args)
-url = "https://class.coursera.org/introfinance-004/data/export/csv_quiz_responses"
+url = "https://class.coursera.org/valuationplayspace-001/data/export/csv_quiz_responses"
 # display = Display(visible=0, size=(800, 600))
 # display.start()
-
-
 
 def load_course_details():
     browser = webdriver.Firefox(firefox_profile=get_download_profile())
     login_coursera_website(browser,username,password)
     WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.ID, "rendered-content")))
     browser.get(url)
-    files = []
 
     el = browser.find_element_by_name('quiz_id')
     for option in el.find_elements_by_tag_name('option'):
-        if re.match(r"Assignment*".format(assignment), option.text):
-            files.append((option.text))
-    if all == True:
-        for option in browser.find_element_by_name('quiz_id').find_elements_by_tag_name('option'):
-            if option.text in files:
-                print(option.text)
-                download_file(option, browser)
-    else:
-        for option in browser.find_element_by_name('quiz_id').find_elements_by_tag_name('option'):
-            if option.text == assignment:
-                print(option.text)
-                download_file(option, browser)
+        if "Assignment 1 (RV2.140824)" in option.text:
+             download_file(option, browser)
+             break
 
-    #display.stop()
 
 def download_file(element, browser):
     element.click()
     browser.find_element_by_name("include_cuid").click()
+    browser.find_element_by_name("include_pii").click()
     browser.find_element_by_name("submit").click()
     browser.find_element_by_link_text("Refresh").click()
     while (check_exists_by_xpath(".//*[@id='spark']/table/tbody/tr[1]/td[5]/a[1]", browser) != True):
         browser.find_element_by_link_text("Refresh").click()
-        WebDriverWait(browser, SECONDS_TO_WAIT)
+        print("Download not yet ready, waiting")
+        WebDriverWait(browser, 120)
     browser.find_element_by_xpath(".//*[@id='spark']/table/tbody/tr[1]/td[5]/a[1]").click()
+    print("The file should be downloaded now to your firefox download folder")
 
 load_course_details()
