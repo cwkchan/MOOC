@@ -23,18 +23,18 @@ from sqlalchemy import *
 from sqlalchemy.exc import *
 
 def __get_nested_item(item, dikt):
-	"""Gets an item out of a nested dictionary of items, or None if it
-	doesn't exist.  We are aiming to deal with this JSON data quickly:
-	http://dev.maxmind.com/geoip/geoip2/web-services"""
-	try:
-		for key in item:
-			if type(dikt) == list:
-				#todo: the list could have more than one subdivision in it, handle that in a normalized schema
-				dikt=dikt[0]
-			dikt=dikt[key]
-		return dikt
-	except:
-		return None
+    """Gets an item out of a nested dictionary of items, or None if it
+    doesn't exist.  We are aiming to deal with this JSON data quickly:
+    http://dev.maxmind.com/geoip/geoip2/web-services"""
+    try:
+        for key in item:
+            if type(dikt) == list:
+                #todo: the list could have more than one subdivision in it, handle that in a normalized schema
+                dikt=dikt[0]
+            dikt=dikt[key]
+        return dikt
+    except:
+        return None
 
 parser = argparse.ArgumentParser(description='Create tables to map IP addresses to countries.  This script can be called directly, but is intended to be called by other python scripts in this package.  The result of running this script is that IP address details are populated in the coursera_geolocate table.  For instance, if you wanted to call this script on all IP addresses from the coursera last_ip value in all of your schemas you might use: python ./geolocate.py  --clean --verbose --sql="SELECT DISTINCT last_access_ip FROM users WHERE last_access_ip IS NOT NULL AND last_access_ip NOT LIKE \'\'"')
 parser.add_argument('--clean', action='store_true', help='Whether to drop tables in the database or not')
@@ -47,24 +47,24 @@ logger=get_logger("geolocate.py",args.verbose)
 
 geolitedb="GeoLite2-City.mmdb"
 try:
-	reader = maxminddb.Reader(geolitedb)
+    reader = maxminddb.Reader(geolitedb)
 except:
-	logger.error("File {} not found".format(geolitedb))
-	sys.exit()
+    logger.error("File {} not found".format(geolitedb))
+    sys.exit()
 
 conn=get_connection()
 
 if (args.schemas!=None):
-	schemas=args.schemas.split(",")
+    schemas=args.schemas.split(",")
 else:
-	schemas=get_coursera_schema_list()
+    schemas=get_coursera_schema_list()
 
 if (args.clean):
-	query="DROP TABLE IF EXISTS coursera_geolocate"
-	try:
-		conn.execute(query)
-	except:
-		pass
+    query="DROP TABLE IF EXISTS coursera_geolocate"
+    try:
+        conn.execute(query)
+    except:
+        pass
 
 query="""CREATE TABLE IF NOT EXISTS `coursera_geolocate` (
   `ip` varchar(15) DEFAULT NULL,
@@ -82,55 +82,63 @@ query="""CREATE TABLE IF NOT EXISTS `coursera_geolocate` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;"""
 
 try:
-	conn.execute(query)
+    conn.execute(query)
 except:
-	pass
-	
+    pass
+
 metadata = MetaData()
 metadata.reflect(bind=conn)
 tbl_coursera_geolocate=metadata.tables["coursera_geolocate"]
-
 query=args.sql
 #todo: should get the list of IPs already setup in the db so we don't have to bother
 #looking them up again
 ip_set=set()
+
 for schema in schemas:
-	try:
-		schema_conn=get_connection(schema)
-		results=schema_conn.execute(query)
-		for row in results:
-			#sometimes multiple IPs
-			ip=row[0]
-			if len(ip.split(",")) > 1:
-				map(ip_set.add,ip.split(","))
-			else:
-				ip_set.add(ip)
-	except Exception as e:
-		logger.warn("Error accessing schem {} with exception {}".format(schema, e))
-		continue
+    print("Schema: {}".format(schema))
+    try:
+        schema_conn=get_connection(schema)
+        print("Query {}".format(query))
+        results=schema_conn.execute(query)
+        print("Connection obtained" )
+        for row in results:
+            #sometimes multiple IPs
+            ip=row[0]
+            print("IP in result set: {}".format(ip))
+            if len(ip.split(",")) > 1:
+                map(ip_set.add,ip.split(","))
+            else:
+                ip_set.add(ip)
+    except Exception as e:
+        logger.warn("Error accessing schema {} with exception {}".format(schema, e))
+        continue
 
 for ip in ip_set:
-	try:
-		entry_dict=reader.get(ip.strip())
-		output_dict={"ip":ip.strip()}
-		output_dict["continent"]=__get_nested_item(["continent","names","en"], entry_dict)
-		output_dict["country"]=__get_nested_item(["country","names","en"], entry_dict)
-		output_dict["country_iso"]=__get_nested_item(["country","iso_code"], entry_dict)
-		output_dict["latitude"]=__get_nested_item(["location","latitude"], entry_dict)
-		output_dict["longitude"]=__get_nested_item(["location","longitude"], entry_dict)
-		output_dict["city"]=__get_nested_item(["city","names","en"], entry_dict)
-		output_dict["subdivisions_iso"]=__get_nested_item(["subdivisions","iso_code"], entry_dict)
-		output_dict["subdivisions"]=__get_nested_item(["subdivisions","names","en"], entry_dict)
-		output_dict["postal"]=__get_nested_item(["postal","code"], entry_dict)
-		output_dict["time_zone"]=__get_nested_item(["location","time_zone"], entry_dict)
-		conn.execute( tbl_coursera_geolocate.insert().values(output_dict) )
-	except IntegrityError as ie:
-		#supress duplicate key errors in MySQL
-		if str(ie.orig).startswith("1062: Duplicate"):
-			continue
-		else:
-			logger.warn("Error entering data for ip {} {}".format(ip,ie))
-	except Exception as e:
-		logger.warn("Error entering data for ip {} {}".format(ip,e))
+    try:
+        entry_dict=reader.get(ip.strip())
+        print("IP in ip set: {}".format(ip))
+        output_dict={"ip":ip.strip()}
+        output_dict["continent"]=__get_nested_item(["continent","names","en"], entry_dict)
+        output_dict["country"]=__get_nested_item(["country","names","en"], entry_dict)
+        output_dict["country_iso"]=__get_nested_item(["country","iso_code"], entry_dict)
+        output_dict["latitude"]=__get_nested_item(["location","latitude"], entry_dict)
+        output_dict["longitude"]=__get_nested_item(["location","longitude"], entry_dict)
+        output_dict["city"]=__get_nested_item(["city","names","en"], entry_dict)
+        output_dict["subdivisions_iso"]=__get_nested_item(["subdivisions","iso_code"], entry_dict)
+        output_dict["subdivisions"]=__get_nested_item(["subdivisions","names","en"], entry_dict)
+        output_dict["postal"]=__get_nested_item(["postal","code"], entry_dict)
+        output_dict["time_zone"]=__get_nested_item(["location","time_zone"], entry_dict)
+        print("IP on output: {} \n".format(ip))
+        print(output_dict)
+        conn.execute(tbl_coursera_geolocate.insert().values(output_dict))
+
+    except IntegrityError as ie:
+        #supress duplicate key errors in MySQL
+        if str(ie.orig).startswith("1062: Duplicate"):
+            continue
+        else:
+            logger.warn("Error entering data for ip {} {}".format(ip,ie))
+    except Exception as e:
+        logger.warn("Error entering data for ip {} {}".format(ip,e))
 
 reader.close()

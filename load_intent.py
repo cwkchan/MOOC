@@ -42,14 +42,12 @@ if args.clean:
     except:
         pass
 
-query = """CREATE TABLE IF NOT EXISTS `coursera_intent` (
-            `intent_id` INT NOT NULL AUTO_INCREMENT,
-            `user_id` INT NOT NULL,
-            `session_id` VARCHAR(255) NOT NULL,
-            `submission_ts` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            `choice_id` INT NOT NULL,
-            PRIMARY KEY (`intent_id`)
-            ) ; """
+query = ("CREATE TABLE IF NOT EXISTS coursera_intent (\n"
+         "	user_id INTEGER NOT NULL,\n"
+         "	session_id VARCHAR(255) NOT NULL,\n"
+         "	submission_ts TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
+         "	choice_id INTEGER NOT NULL\n"
+         "	) ;")
 
 conn.execute(query)
 

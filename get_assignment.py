@@ -29,8 +29,9 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 parser = argparse.ArgumentParser(description='Downloads the assignments from the specified course')
+parser.add_argument('--schema', action='store', help="Name of the course")
 parser.add_argument('--assignment', action='store',
-                    help="The assignment to download. PAss all to download all assignments.")
+                    help="The assignment to download. The name of the assignment to download")
 parser.add_argument('--verbose', action='store_true', help='Whether to debug log or not')
 parser.add_argument('--username', action='store',
                     help="The username to connect to log into the Coursera site with, checks config.properties for "
@@ -41,23 +42,18 @@ parser.add_argument('--password', action='store',
 
 args = parser.parse_args()
 
+if not args.schema:
+    print("\nPlease provide the name of the course to download")
+    sys.exit(1)
+
+if not args.assignment:
+    print("\nPlease provide the exact name of the assignment to download")
+    sys.exit(1)
+
+assignment = args.assignment
+url = "https://class.coursera.org/{}/data/export/csv_quiz_responses".format(args.schema)
+
 username, password = username_and_password_exist(args)
-url = "https://class.coursera.org/valuationplayspace-001/data/export/csv_quiz_responses"
-# display = Display(visible=0, size=(800, 600))
-# display.start()
-
-def load_course_details():
-    browser = webdriver.Firefox(firefox_profile=get_download_profile())
-    login_coursera_website(browser,username,password)
-    WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.ID, "rendered-content")))
-    browser.get(url)
-
-    el = browser.find_element_by_name('quiz_id')
-    for option in el.find_elements_by_tag_name('option'):
-        if "Assignment 1 (RV2.140824)" in option.text:
-             download_file(option, browser)
-             break
-
 
 def download_file(element, browser):
     element.click()
@@ -72,4 +68,26 @@ def download_file(element, browser):
     browser.find_element_by_xpath(".//*[@id='spark']/table/tbody/tr[1]/td[5]/a[1]").click()
     print("The file should be downloaded now to your firefox download folder")
 
-load_course_details()
+display = Display(visible=0, size=(800, 600))
+display.start()
+
+browser = webdriver.Firefox(firefox_profile=get_download_profile())
+login_coursera_website(browser,username,password)
+WebDriverWait(browser, SECONDS_TO_WAIT).until(EC.presence_of_element_located((By.ID, "rendered-content")))
+browser.get(url)
+
+el = browser.find_element_by_name('quiz_id')
+
+for option in el.find_elements_by_tag_name('option'):
+    if assignment in option.text:
+        download_file(option, browser)
+        break
+
+browser.quit()
+display.stop()
+
+
+
+
+
+

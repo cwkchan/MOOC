@@ -64,18 +64,23 @@ wc=`grep "$dbname" ${temporary_file} | wc -l`
 	exit 1
 	fi
 echo "INFO: Loading database $dbname"  
-        mysql -h $db_server -u "$user" -p"$password"  -e "drop database if exists \`$dbname\` ; create database \`$dbname\` " 
+        #mysql -h $db_server -u "$user" -p"$password"  -e "drop database if exists \`$dbname\` ; create database \`$dbname\` " 
+	createdb -h $endpoint -U $user -p $port $dbname
 
         echo "INFO: Uploading the following files..."
         find "$home_dir" -name "*$dbname*.sql" | awk '{ print "source",$0 }'
-        find "$home_dir" -name "*$dbname*.sql" | awk '{ print "source",$0 }' | mysql -h $db_server -u "$user" -p"$password" "$dbname"
+        #find "$home_dir" -name "*$dbname*.sql" | awk '{ print "source",$0 }' | mysql -h $db_server -u "$user" -p"$password" "$dbname"
+	echo "find "$home_dir" -name "*$dbname*.sql" | awk '{ print "source",$0 }' | psql -h $endpoint -U $user -p $port -d $dbname"
+	find "$home_dir" -name "*$dbname*.sql" | awk '{ print "source",$0 }' | psql -h $endpoint -U $user -p $port -d $dbname
 else 
 while read database; do
 	echo "INFO: Loading database $database"  
-  	mysql -h $db_server -u "$user" -p"$password"  -e "drop database if exists \`$database\` ; create database \`$database\` " 
+  	#mysql -h $db_server -u "$user" -p"$password"  -e "drop database if exists \`$database\` ; create database \`$database\` " 
+	createdb -h $endpoint -U $user -p $port $dbname
 	echo "INFO: Uploading the following files..."
 	find "$home_dir" -name "*$database*.sql" | awk '{ print "source",$0 }'
-	find "$home_dir" -name "*$database*.sql" | awk '{ print "source",$0 }' | mysql -h $db_server -u "$user" -p"$password" "$database"   
+	#find "$home_dir" -name "*$database*.sql" | awk '{ print "source",$0 }' | mysql -h $db_server -u "$user" -p"$password" "$database"   
+	psql -h $endpoint -U $user -p $port -d $dbname -f
 
 done < $temporary_file 
 fi

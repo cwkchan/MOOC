@@ -13,21 +13,14 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see [http://www.gnu.org/licenses/].
 
-from util.coursera_db import *
+from util.coursera_files import *
 from core.coursera import Course, Base
 
 import argparse
-
 import pandas
 from sqlalchemy.orm import sessionmaker
 
-"""The personally identifiable information files contain the following :
-full_name
-email_address
-coursera_user_id
-session_user_id
-forum_user_id """
-
+logger = get_logger("load_pii")
 
 parser = argparse.ArgumentParser(description='Import coursera pii files into the database.  Will check which courses'
                                              'have not have files loaded into the DB and attempt to load them.')
@@ -37,8 +30,8 @@ args = parser.parse_args()
 
 logger = get_logger("load_pii.py", args.verbose)
 conn = get_db_connection()
-config = get_properties()
-connection = create_engine(config["engine"] + 'uselab_mooc')
+s3_path = (get_properties().get('s3_path', None) + 'pii/')
+
 
 if args.clean:
     query = "DROP TABLE IF EXISTS coursera_pii"
@@ -50,14 +43,15 @@ if args.clean:
 query = (""
          "CREATE TABLE IF NOT EXISTS coursera_pii ("
          "coursera_user_id INTEGER NOT NULL,"
-         "session_id VARCHAR(255) NOT NULL,"
          "access_group VARCHAR(255) NOT NULL,"
          "email_address VARCHAR(255) DEFAULT NULL,"
-         "full_name VARCHAR(255) DEFAULT NULL,"
+         "full_name VARCHAR(1024) DEFAULT NULL,"
          "last_access_ip VARCHAR(255) DEFAULT NULL,"
-         "deleted INTEGER DEFAULT NULL,"
+         "deleted INTEGER DEFAULT 0,"
+         "session_id VARCHAR(255) NOT NULL,"
          "PRIMARY KEY (coursera_user_id, session_id)"
          ");")
+
 conn.execute(query)
 
 Base.metadata.create_all(conn)
@@ -78,4 +72,25 @@ for course in session.query(Course):
     if not __pii_loaded(course) and course.has_pii():
         df = pandas.read_csv(course.get_pii_filename())
         df["session_id"]=course.session_id
-        df.to_sql('coursera_pii', connection, if_exists='append', index=False)
+        df.to_csv('/tmp/{}.csv'.format(course.session_id),header=False, sep='|', index=False, quoting=csv.QUOTE_ALL )
+
+        file_name = '/tmp/{}.csv'.format(course.session_id)
+        try:
+            pass #upload_s3_file(file_name, 'pii')
+        except:
+            logger.exception("This file : {} could not be uploaded to S3. Please update manually".format(file_name))
+            logger.exception(traceback.format_exc(limit=None))
+
+        path = (s3_path + '{}.csv'.format(course.session_id))
+        print(path)
+
+        try:
+            pass #copy_s3_to_redshift(conn, path, 'coursera_pii',schema=None, delim="|", error=0, ignoreheader=0)
+
+        except:
+            logger.exception("This table : {} could not be loaded from the file : {}. Please check pgcatalog.stl_load_errors".format('coursera_pii',path ))
+            logger.exception(traceback.format_exc(limit=None))
+
+        # else:
+        #     os.remove(file_name)
+
