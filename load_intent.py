@@ -54,7 +54,7 @@ query = """CREATE TABLE IF NOT EXISTS `coursera_intent` (
 conn.execute(query)
 
 Base.metadata.create_all(conn)
-Session = sessionmaker(bind=conn)
+Session = sessionmaker(bind=conn)y
 session = Session()
 
 metadata = MetaData()
