@@ -4,12 +4,9 @@ import boto3
 
 
 
-#note: update access key and secret access key
-aws_access_key_id="AKIAJ5AY3SPCD5PF7UKQ"
-aws_secret_access_key="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"
 
 
-def send_email_alert(sender, subject, body, to, format="text"):
+def send_email_alert(sender, subject, body, to, aws_access_key_id, aws_secret_access_key, format="text"):
     """
     If you're using this with new credentials or change the sender, you may need to verify the sender address.
 
@@ -55,14 +52,4 @@ def send_email_alert(sender, subject, body, to, format="text"):
 
     client.send_email(Source = sender, Destination = alert_destination, Message = alert_contents)
 
-
-def main():
-	
-    send_email_alert(sender = "led-alerts@umich.edu", subject = 'LED Lab AWS UpdateTEST', body = 'Messsage Body: This is a test of the Boto3 email update alert.', to = 'jpgard@umich.edu')
-    
-
-if __name__ == '__main__':
-	print "Sending Message..."
-	main()
-	print "Complete"
 
