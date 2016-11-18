@@ -128,7 +128,7 @@ def rip_pages():
         if course_details['session_id'] not in blacklist:
             print("Adding data on {} to list.".format(course_details['session_id']))
             courses.append(course_details)
-        else :
+        else:
             print("Skipping the blacklisted course {}.".format(course_details['session_id']))
 
 
@@ -160,4 +160,38 @@ def rip_pages():
     browser.quit()
     display.stop()
 
-rip_pages()
+#rip_pages()
+
+def rip_takeout():
+    import pandas as pd
+    browser = webdriver.Firefox()
+    login_coursera_website(browser, username, password)
+    sleep(3)
+    opener=build_coursera_opener(browser)
+
+    df=pd.read_csv("output.csv")
+    for item in df["url"]:
+        try:
+            #this saves the non-assets
+            f = opener.open("{}/admin/takeout/platform".format(item))
+            lines = f.read()
+            out_filename="./dumps/"+item.split("/")[-2]+".tar.gz"
+            print(out_filename)
+            f_out=open(out_filename,"wb")
+            f_out.write(lines)
+            f_out.close()
+
+            #this saves the shell file for assets
+            f = opener.open("{}/admin/takeout/assetsShell".format(item))
+            lines = f.read()
+            out_filename="./dumps/"+item.split("/")[-2]+".sh"
+            print(out_filename)
+            f_out=open(out_filename,"wb")
+            f_out.write(lines)
+            f_out.close()
+
+        except Exception as e:
+            print("Received an error {} for URL: {}".format(e,"{}/admin/takeout/platform".format(item)))
+
+
+rip_takeout()
